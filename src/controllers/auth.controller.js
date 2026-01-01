@@ -195,7 +195,13 @@ export const signin = asyncHandler(async (req, res) => {
     
     if (!isPaswordValid) {
         throw new ApiError(StatusCodes.UNAUTHORIZED, UN_AUTHORIZED);
-      }
+    }
+    
+    // Check if email is verified before allowing signin
+    // Stricter check to handle false, null, undefined cases
+    if (user.isVerified !== true) {
+        throw new ApiError(StatusCodes.FORBIDDEN, NOT_VERIFY);
+    }
       
     const { accessToken, refreshToken } = await generateAccessAndRefreshToken(user.id);
     
@@ -341,7 +347,8 @@ export const forgotPassword = asyncHandler(async (req, res) => {
         return res.status(StatusCodes.FORBIDDEN).json(new ApiError(StatusCodes.FORBIDDEN, NOT_VERIFY));
     }
 
-    const resetLink = `${process.env.ALLOWED_ORIGIN_1}/change-password/${user.refreshToken}`;
+    // Generate reset token (use refreshToken as reset token)
+    const resetLink = `${process.env.ALLOWED_ORIGIN_1 || 'http://localhost:3000'}/api/v1/auth/change-password/${user.refreshToken}`;
     sendEmailLink(email, resetLink)
         .then(() => console.log("Reset email sent successfully"))
         .catch((err) => console.error("Error sending reset email:", err));
@@ -353,24 +360,35 @@ export const forgotPassword = asyncHandler(async (req, res) => {
 
 
 
-// @desc    CHANGE-CURRENT-PASSWORD
-// @route   PUT api/v1/user/resetPasswordEmail
-// @access  Private
+// @desc    CHANGE-CURRENT-PASSWORD (Password Reset)
+// @route   POST api/v1/auth/change-password/:token
+// @access  Public (token-based)
 
 export const changeCurrentPassword = asyncHandler(async (req, res) => {
-    const { oldPassword, newPassword } = req.body;
-    const { token } = req.params
+    const { newPassword, confirmPassword } = req.body;
+    const { token } = req.params;
     const refreshToken = token;
 
-     const user = await User.findOne({ refreshToken: refreshToken });
-    console.log(user);
-    
-    const isPasswordCorrect = await user.isPasswordCorrect(oldPassword);
-    if (!isPasswordCorrect) {
-        throw new ApiError(StatusCodes.BAD_REQUEST, INVALID_DATA);
+    // Validate input
+    if (!newPassword) {
+        throw new ApiError(StatusCodes.BAD_REQUEST, MISSING_FIELDS);
     }
 
+    // Optional: Check if confirmPassword matches
+    if (confirmPassword && newPassword !== confirmPassword) {
+        throw new ApiError(StatusCodes.BAD_REQUEST, PASSWORD_AND_CONFIRM_NO_MATCH);
+    }
+
+    // Find user by refresh token (used as reset token)
+    const user = await User.findOne({ refreshToken: refreshToken });
+    
+    if (!user) {
+        throw new ApiError(StatusCodes.NOT_FOUND, INVALID_TOKEN);
+    }
+
+    // Update password (no need to check old password for reset)
     user.password = newPassword;
+    user.refreshToken = null; // Clear reset token after use for security
     await user.save({ validateBeforeSave: false });
 
     return res.status(StatusCodes.OK).send(new ApiResponse(StatusCodes.OK, PASSWORD_CHANGE, {}));

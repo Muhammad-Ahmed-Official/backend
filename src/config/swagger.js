@@ -148,17 +148,19 @@ const options = {
         },
         ChangePasswordRequest: {
           type: 'object',
-          required: ['oldPassword', 'newPassword'],
+          required: ['newPassword'],
           properties: {
-            oldPassword: {
-              type: 'string',
-              format: 'password',
-              example: 'OldPass123!'
-            },
             newPassword: {
               type: 'string',
               format: 'password',
-              example: 'NewPass123!'
+              example: 'NewPass123!',
+              description: 'New password for reset'
+            },
+            confirmPassword: {
+              type: 'string',
+              format: 'password',
+              example: 'NewPass123!',
+              description: 'Confirm new password (optional)'
             }
           }
         },
