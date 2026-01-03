@@ -8,7 +8,6 @@ const { UNAUTHORIZED_REQUEST, INVALID_TOKEN, ADMIN_ACCESS} = responseMessages
 
 export const verifyJwt = asyncHandler(async (req, _, next) => {
     const token = req.cookies?.accessToken || req.header("Authorization")?.replace("Bearer ", "");
-    // console.log(token);
     
     if (!token) {
         throw new ApiError(StatusCodes.UNAUTHORIZED, UNAUTHORIZED_REQUEST);

@@ -122,8 +122,6 @@ export const resendOtp = asyncHandler( async (req, res) => {
 // @access  Private
 
 export const verifyEmail = asyncHandler(async (req, res) => {
-        console.log(req.body);
-        
         const { otp } = req.body;
         
         // Validate the input
@@ -134,8 +132,6 @@ export const verifyEmail = asyncHandler(async (req, res) => {
         }
 
         // Fetch the user
-        // console.log(req);
-
         const user = await User.findOne({ email: req.user.email });
         if (!user) {
             return res
@@ -405,7 +401,6 @@ export const refreshAccessToken =  asyncHandler(async (req, res) => {
 
     try {
         const decodedToken = jwt.verify(getRefreshToken, process.env.REFRESH_TOKEN_SECRET);
-        console.log(decodedToken);
         
         const user = await User.findById(decodedToken?._id || decodedToken?.id);
         if(!user){

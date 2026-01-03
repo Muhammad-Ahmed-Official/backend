@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { changeCurrentPassword, forgotPassword, googleSignin, logout, resendOtp, signin, signup, verifyEmail } from "../controllers/auth.controller.js";
+import { changeCurrentPassword, forgotPassword, googleSignin, logout, resendOtp, signin, signup, verifyEmail, getUserInfo, updateUser, refreshAccessToken, getCurrentUser } from "../controllers/auth.controller.js";
 import { verifyJwt } from "../middleware/auth.middleware.js";
 
 const authRouter = Router();
@@ -220,5 +220,88 @@ authRouter.route("/forgot-password").post(forgotPassword);
  *         description: Invalid credentials or token
  */
 authRouter.route("/change-password/:token").post(changeCurrentPassword);
+
+/**
+ * @swagger
+ * /api/v1/auth/current-user:
+ *   get:
+ *     summary: Get current authenticated user
+ *     tags: [Authentication]
+ *     security:
+ *       - bearerAuth: []
+ *       - cookieAuth: []
+ *     responses:
+ *       200:
+ *         description: Current user information
+ *       401:
+ *         description: Unauthorized
+ */
+authRouter.route("/current-user").get(verifyJwt, getCurrentUser);
+
+/**
+ * @swagger
+ * /api/v1/auth/isUser:
+ *   post:
+ *     summary: Get user information by ID
+ *     tags: [Authentication]
+ *     security:
+ *       - bearerAuth: []
+ *       - cookieAuth: []
+ *     responses:
+ *       200:
+ *         description: User information
+ *       401:
+ *         description: Unauthorized
+ */
+authRouter.route("/isUser").post(verifyJwt, getUserInfo);
+
+/**
+ * @swagger
+ * /api/v1/auth/update-user:
+ *   post:
+ *     summary: Update user profile
+ *     tags: [Authentication]
+ *     security:
+ *       - bearerAuth: []
+ *       - cookieAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               userName:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: User updated successfully
+ *       401:
+ *         description: Unauthorized
+ */
+authRouter.route("/update-user").post(verifyJwt, updateUser);
+
+/**
+ * @swagger
+ * /api/v1/auth/refresh-token:
+ *   post:
+ *     summary: Refresh access token
+ *     tags: [Authentication]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               refreshToken:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Token refreshed successfully
+ *       401:
+ *         description: Unauthorized
+ */
+authRouter.route("/refresh-token").post(refreshAccessToken);
 
 export default authRouter;

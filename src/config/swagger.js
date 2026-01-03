@@ -229,8 +229,6 @@ const swaggerDocs = (app) => {
     res.setHeader('Content-Type', 'application/json');
     res.send(swaggerSpec);
   });
-
-  console.log(`📚 Swagger UI available at http://localhost:${process.env.PORT || 3000}/api-docs`);
 };
 
 export default swaggerDocs;

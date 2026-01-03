@@ -40,7 +40,6 @@ async function sendEmailOTP(mail, otp) {
 
 
 async function sendEmailLink(mail, link) { 
-    console.log(link);
     const emailConfig = getEmailConfig();
     const transporter = nodemailer.createTransport(emailConfig);
     const mailOptions = {

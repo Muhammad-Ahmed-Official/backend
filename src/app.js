@@ -1,6 +1,5 @@
 import express from "express";
 import cors from "cors";
-import { sendEmailOTP } from "./utils/sendEmail.js";
 import { StatusCodes } from "http-status-codes";
 import cookieParser from "cookie-parser";
 import swaggerDocs from "./config/swagger.js";
@@ -10,10 +9,30 @@ import authRouter from "./routes/auth.route.js";
 const app = express();
 // Middleware Configurations
 app.use(cors({
-  origin: [process.env.ALLOWED_ORIGIN_1, process.env.ALLOWED_ORIGIN_2],
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    
+    const allowedOrigins = [
+      process.env.ALLOWED_ORIGIN_1,
+      process.env.ALLOWED_ORIGIN_2,
+      process.env.ALLOWED_ORIGIN_3,
+      process.env.ALLOWED_ORIGIN_4,
+      'http://localhost:8081',
+      'http://localhost:19006',
+      'http://192.168.100.146:8081',
+      'http://192.168.100.146:19006',
+    ].filter(Boolean);
+    
+    if (allowedOrigins.indexOf(origin) !== -1 || allowedOrigins.length === 0) {
+      callback(null, true);
+    } else {
+      callback(null, true); // Allow all origins for development
+    }
+  },
   credentials: true,
-  methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
-  allowedHeaders: ["Origin", "X-Requested-With", "Content-Type", "Accept"]
+  methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+  allowedHeaders: ["Origin", "X-Requested-With", "Content-Type", "Accept", "Authorization"]
 }));
 
 
@@ -35,45 +54,6 @@ app.use("/api/v1/auth", authRouter);
 // app.use("/api/v1/user", userRouter);
 // app.use("/api/v1/comment", commentRouter);
 
-// Add this before "Handle Undefined Routes"
-app.get("/test-email", async (req, res) => {
-  const { email } = req.query;
-  
-  if (!email) {
-    return res.status(400).json({
-      status: "error",
-      message: "Please provide email query parameter",
-      example: "/test-email?email=your-email@gmail.com"
-    });
-  }
-  
-  if (!process.env.PORTAL_EMAIL || !process.env.PORTAL_PASSWORD) {
-    return res.status(500).json({
-      status: "error",
-      message: "Email configuration missing",
-      required: ["PORTAL_EMAIL", "PORTAL_PASSWORD"]
-    });
-  }
-  
-  const testOTP = Math.floor(100000 + Math.random() * 900000).toString();
-  
-  try {
-    const result = await sendEmailOTP(email, testOTP);
-    return res.status(200).json({
-      status: "success",
-      message: "Test OTP email sent!",
-      email: email,
-      otp: testOTP,
-      result: result
-    });
-  } catch (error) {
-    return res.status(500).json({
-      status: "error",
-      message: "Failed to send email",
-      error: error.toString()
-    });
-  }
-});
 // Handle Undefined Routes
 app.all(/.*/, (req, res) => {
   res.status(StatusCodes.NOT_FOUND).send({
