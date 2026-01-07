@@ -16,12 +16,14 @@ const options = {
     },
     servers: [
       {
-        url: `http://localhost:${process.env.PORT || 3000}`,
-        description: 'Development server'
+        url: process.env.VERCEL_URL 
+          ? `https://${process.env.VERCEL_URL}` 
+          : `http://localhost:${process.env.PORT || 3000}`,
+        description: process.env.VERCEL_URL ? 'Production server' : 'Development server'
       },
       {
-        url: process.env.API_URL || 'https://api.example.com',
-        description: 'Production server'
+        url: process.env.API_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://api.example.com'),
+        description: 'API Server'
       }
     ],
     components: {
@@ -223,17 +225,42 @@ const options = {
 const swaggerSpec = swaggerJsdoc(options);
 
 const swaggerDocs = (app) => {
-  // Swagger UI
+  // Get base URL for Swagger (works with Vercel)
+  const getBaseUrl = (req) => {
+    if (process.env.VERCEL_URL) {
+      return `https://${process.env.VERCEL_URL}`;
+    }
+    const protocol = req.protocol || 'http';
+    const host = req.get('host') || `localhost:${process.env.PORT || 3000}`;
+    return `${protocol}://${host}`;
+  };
+
+  // Swagger UI endpoint - dynamically update server URL
   app.use('/api-docs', serve, setup(swaggerSpec, {
     customCss: '.swagger-ui .topbar { display: none }',
     customSiteTitle: 'Backend API Documentation',
-    customfavIcon: '/favicon.ico'
+    customfavIcon: '/favicon.ico',
+    swaggerOptions: {
+      persistAuthorization: true,
+      displayRequestDuration: true,
+      tryItOutEnabled: true
+    }
   }));
 
-  // Swagger JSON endpoint
+  // Swagger JSON endpoint - dynamically update server URL based on request
   app.get('/api-docs.json', (req, res) => {
+    const baseUrl = getBaseUrl(req);
+    const updatedSpec = {
+      ...swaggerSpec,
+      servers: [
+        {
+          url: baseUrl,
+          description: 'Current Server'
+        }
+      ]
+    };
     res.setHeader('Content-Type', 'application/json');
-    res.send(swaggerSpec);
+    res.send(updatedSpec);
   });
 };
 
