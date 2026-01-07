@@ -238,6 +238,7 @@ const swaggerDocs = (app) => {
   // Swagger UI endpoint - custom HTML with CDN (Vercel compatible)
   app.get('/api-docs', (req, res) => {
     const baseUrl = getBaseUrl(req);
+    // Use relative URL to avoid CORS issues
     const html = `
 <!DOCTYPE html>
 <html lang="en">
@@ -256,7 +257,7 @@ const swaggerDocs = (app) => {
   <script>
     window.onload = function() {
       const ui = SwaggerUIBundle({
-        url: '${baseUrl}/api-docs.json',
+        url: '/api-docs.json',
         dom_id: '#swagger-ui',
         presets: [
           SwaggerUIBundle.presets.apis,
@@ -294,8 +295,20 @@ const swaggerDocs = (app) => {
         }
       ]
     };
+    // Set CORS headers to allow Swagger UI to fetch the JSON
     res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
     res.send(updatedSpec);
+  });
+  
+  // Handle OPTIONS request for CORS preflight
+  app.options('/api-docs.json', (req, res) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    res.sendStatus(200);
   });
 };
 
