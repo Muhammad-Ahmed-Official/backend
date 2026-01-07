@@ -8,12 +8,28 @@ export class User {
     this.userName = data.user_name;
     this.email = data.email;
     this.password = data.password;
+    this.role = data.role || 'Freelancer'; // Default role
     this.otp = data.otp;
     this.expiresIn = data.expires_in;
     this.isVerified = data.is_verified;
     this.refreshToken = data.refresh_token;
     this.createdAt = data.created_at;
     this.updatedAt = data.updated_at;
+    
+    // Profile fields
+    this.title = data.title;
+    this.bio = data.bio;
+    this.skills = data.skills || [];
+    this.hourlyRate = data.hourly_rate;
+    this.location = data.location;
+    this.phone = data.phone;
+    this.languages = data.languages || [];
+    this.education = data.education || [];
+    this.experience = data.experience || [];
+    this.certifications = data.certifications || [];
+    this.portfolio = data.portfolio || [];
+    this.profileImage = data.profile_image;
+    this.availability = data.availability;
   }
 
   // Convert to plain object
@@ -22,9 +38,24 @@ export class User {
       id: this.id,
       userName: this.userName,
       email: this.email,
+      role: this.role,
       isVerified: this.isVerified,
       createdAt: this.createdAt,
-      updatedAt: this.updatedAt
+      updatedAt: this.updatedAt,
+      // Profile fields
+      title: this.title,
+      bio: this.bio,
+      skills: this.skills,
+      hourlyRate: this.hourlyRate,
+      location: this.location,
+      phone: this.phone,
+      languages: this.languages,
+      education: this.education,
+      experience: this.experience,
+      certifications: this.certifications,
+      portfolio: this.portfolio,
+      profileImage: this.profileImage,
+      availability: this.availability,
     };
   }
 
@@ -126,12 +157,17 @@ export class User {
     // Hash password before saving
     const hashedPassword = await bcrypt.hash(userData.password, 10);
     
+    // Validate and set default role
+    const validRoles = ['Admin', 'Client', 'Freelancer'];
+    const userRole = userData.role && validRoles.includes(userData.role) ? userData.role : 'Freelancer';
+    
     const { data, error } = await supabase
       .from('f_users')
       .insert({
         user_name: userData.userName.toLowerCase(),
         email: userData.email,
         password: hashedPassword,
+        role: userRole,
         otp: userData.otp,
         expires_in: userData.expiresIn,
         is_verified: false
@@ -186,6 +222,10 @@ export class User {
         dbUpdateData.user_name = updateData[key];
       } else if (key === 'refreshToken') {
         dbUpdateData.refresh_token = updateData[key];
+      } else if (key === 'hourlyRate') {
+        dbUpdateData.hourly_rate = updateData[key];
+      } else if (key === 'profileImage') {
+        dbUpdateData.profile_image = updateData[key];
       } else {
         dbUpdateData[key] = updateData[key];
       }

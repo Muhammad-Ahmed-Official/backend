@@ -88,6 +88,12 @@ const options = {
               format: 'password',
               example: 'SecurePass123!',
               description: 'User password (min 6 characters)'
+            },
+            role: {
+              type: 'string',
+              enum: ['Admin', 'Client', 'Freelancer'],
+              example: 'Freelancer',
+              description: 'User role (default: Freelancer)'
             }
           }
         },

@@ -25,6 +25,8 @@ export const responseMessages = {
     INVALID_OTP: "Invalid OTP, try again",
     INVALID_TOKEN: "Unauthorized User, Invalid token",
     INVALID_DATA: 'Invalid Credentials',
+    INVALID_EMAIL: 'Invalid email format. Please enter a valid email address',
+    INVALID_EMAIL_DOMAIN: 'Email domain does not exist. Please check for typos and try again',
     IMAGE_ERROR: 'image URL or path is missing',
     IMAGE_SUCCESS:'image upload sucessfully',
     

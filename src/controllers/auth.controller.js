@@ -27,10 +27,14 @@ const generateAccessAndRefreshToken = async (userId) => {
 // @route   POST /api/v1/auth/signup
 // @access  Public
 export const signup = asyncHandler(async (req, res) => {
-    const { userName, email, password } = req.body;
+    const { userName, email, password, role } = req.body;
     if (!userName || !email || !password || typeof userName !== "string" || typeof email !== "string" || typeof password !== "string") {
         throw new ApiError(StatusCodes.BAD_REQUEST, MISSING_FIELDS);
     }
+
+    // Validate role - must be one of: Admin, Client, Freelancer
+    const validRoles = ['Admin', 'Client', 'Freelancer'];
+    const userRole = role && validRoles.includes(role) ? role : 'Freelancer'; // Default to Freelancer
 
     const otp = uuidv4().slice(0, 6); // Generate OTP
     const isUserExist = await User.findOne({ 
@@ -45,6 +49,7 @@ export const signup = asyncHandler(async (req, res) => {
         userName: userName.toLowerCase(),
         email,
         password,
+        role: userRole,
         otp,
         expiresIn: otpExpiry,
     });
@@ -215,7 +220,7 @@ export const signin = asyncHandler(async (req, res) => {
     .cookie("refreshToken", refreshToken, options)
     .send(new ApiResponse(StatusCodes.OK, 
         SUCCESS_LOGIN,
-        {user: loggedInusers, accessToken, SUCCESS_LOGIN },
+        {user: loggedInusers, accessToken, refreshToken },
     ))
 })
 
@@ -287,15 +292,46 @@ export const updateUser = asyncHandler(async (req, res) => {
         throw new ApiError(StatusCodes.BAD_REQUEST, UPDATE_UNSUCCESS_MESSAGES);
     };
 
-    const { userName } = req.body;
-    if (!userName) {
+    const { 
+        userName, 
+        title, 
+        bio, 
+        skills, 
+        hourlyRate, 
+        location, 
+        phone, 
+        languages, 
+        education, 
+        experience, 
+        certifications, 
+        portfolio, 
+        profileImage, 
+        availability 
+    } = req.body;
+    
+    // At least one field should be provided
+    if (!userName && !title && !bio && !skills && !hourlyRate && !location && !phone && !languages && !education && !experience && !certifications && !portfolio && !profileImage && !availability) {
         throw new ApiError(StatusCodes.BAD_REQUEST, NO_DATA_FOUND);
     }
     
-    const user = await User.findByIdAndUpdate(userId, 
-        { userName: userName.toLowerCase() },
-        {new: true}
-    );
+    // Prepare update data
+    const updateData = {};
+    if (userName) updateData.userName = userName.toLowerCase();
+    if (title) updateData.title = title;
+    if (bio) updateData.bio = bio;
+    if (skills) updateData.skills = skills; // Array or JSON
+    if (hourlyRate !== undefined) updateData.hourlyRate = hourlyRate;
+    if (location) updateData.location = location;
+    if (phone) updateData.phone = phone;
+    if (languages) updateData.languages = languages; // JSON array
+    if (education) updateData.education = education; // JSON array
+    if (experience) updateData.experience = experience; // JSON array
+    if (certifications) updateData.certifications = certifications; // JSON array
+    if (portfolio) updateData.portfolio = portfolio; // JSON array
+    if (profileImage) updateData.profileImage = profileImage;
+    if (availability) updateData.availability = availability;
+    
+    const user = await User.findByIdAndUpdate(userId, updateData, {new: true});
     return res.status(StatusCodes.OK).send(new ApiResponse(StatusCodes.OK, UPDATE_SUCCESS_MESSAGES, { user: user.toJSON() }));
 })
 
