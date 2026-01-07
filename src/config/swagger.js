@@ -235,16 +235,51 @@ const swaggerDocs = (app) => {
     return `${protocol}://${host}`;
   };
 
-  // Swagger UI endpoint - dynamically update server URL
-  app.use('/api-docs', serve, setup(swaggerSpec, {
+  // Swagger UI endpoint - custom HTML with CDN (Vercel compatible)
+  app.get('/api-docs', (req, res) => {
+    const baseUrl = getBaseUrl(req);
+    const html = `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Backend API Documentation</title>
+  <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5.17.14/swagger-ui.css" />
+  <style>
+    .swagger-ui .topbar { display: none; }
+  </style>
+</head>
+<body>
+  <div id="swagger-ui"></div>
+  <script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5.17.14/swagger-ui-bundle.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5.17.14/swagger-ui-standalone-preset.js"></script>
+  <script>
+    window.onload = function() {
+      const ui = SwaggerUIBundle({
+        url: '${baseUrl}/api-docs.json',
+        dom_id: '#swagger-ui',
+        presets: [
+          SwaggerUIBundle.presets.apis,
+          SwaggerUIStandalonePreset
+        ],
+        layout: "StandaloneLayout",
+        deepLinking: true,
+        persistAuthorization: true,
+        displayRequestDuration: true,
+        tryItOutEnabled: true
+      });
+    };
+  </script>
+</body>
+</html>
+    `;
+    res.send(html);
+  });
+  
+  // Keep the serve route for compatibility (though it may not work on Vercel)
+  app.use('/api-docs-old', serve, setup(swaggerSpec, {
     customCss: '.swagger-ui .topbar { display: none }',
-    customSiteTitle: 'Backend API Documentation',
-    customfavIcon: '/favicon.ico',
-    swaggerOptions: {
-      persistAuthorization: true,
-      displayRequestDuration: true,
-      tryItOutEnabled: true
-    }
+    customSiteTitle: 'Backend API Documentation'
   }));
 
   // Swagger JSON endpoint - dynamically update server URL based on request
