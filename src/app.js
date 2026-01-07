@@ -18,8 +18,10 @@ app.use(cors({
       process.env.ALLOWED_ORIGIN_2,
       process.env.ALLOWED_ORIGIN_3,
       process.env.ALLOWED_ORIGIN_4,
+      'https://freelanceing-frontend.vercel.app',
       'http://localhost:8081',
       'http://localhost:19006',
+      'http://localhost:8080',
       'http://192.168.100.146:8081',
       'http://192.168.100.146:19006',
     ].filter(Boolean);
