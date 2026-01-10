@@ -4,6 +4,8 @@ import { StatusCodes } from "http-status-codes";
 import cookieParser from "cookie-parser";
 import swaggerDocs from "./config/swagger.js";
 import authRouter from "./routes/auth.route.js";
+import projectRouter from "./routes/project.route.js";
+import proposalRouter from "./routes/proposal.route.js";
 
 
 const app = express();
@@ -52,6 +54,8 @@ swaggerDocs(app);
 
 // Routes
 app.use("/api/v1/auth", authRouter);
+app.use("/api/v1/projects", projectRouter);
+app.use("/api/v1/proposals", proposalRouter);
 // app.use("/api/v1/post", postRouter);
 // app.use("/api/v1/user", userRouter);
 // app.use("/api/v1/comment", commentRouter);

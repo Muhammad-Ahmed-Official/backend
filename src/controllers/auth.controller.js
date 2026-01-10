@@ -302,7 +302,7 @@ export const updateUser = asyncHandler(async (req, res) => {
         education, 
         certifications, 
         portfolio, 
-        profileImage,
+        profileImage, 
         about
     } = req.body;
     
