@@ -280,7 +280,7 @@ export const getUserInfo = asyncHandler(async (req, res) => {
     if (!user) {
         throw new ApiError(StatusCodes.BAD_REQUEST, NO_USER);
     };
-    return res.status(StatusCodes.OK).send(new ApiResponse(StatusCodes.OK, "", user));
+    return res.status(StatusCodes.OK).send(new ApiResponse(StatusCodes.OK, "", user.toJSON()));
  
 })
 
@@ -294,42 +294,36 @@ export const updateUser = asyncHandler(async (req, res) => {
 
     const { 
         userName, 
-        title, 
         bio, 
         skills, 
         hourlyRate, 
-        location, 
         phone, 
         languages, 
         education, 
-        experience, 
         certifications, 
         portfolio, 
-        profileImage, 
-        availability 
+        profileImage,
+        about
     } = req.body;
     
     // At least one field should be provided
-    if (!userName && !title && !bio && !skills && !hourlyRate && !location && !phone && !languages && !education && !experience && !certifications && !portfolio && !profileImage && !availability) {
+    if (!userName && !bio && !skills && !hourlyRate && !phone && !languages && !education && !certifications && !portfolio && !profileImage && !about) {
         throw new ApiError(StatusCodes.BAD_REQUEST, NO_DATA_FOUND);
     }
     
     // Prepare update data
     const updateData = {};
     if (userName) updateData.userName = userName.toLowerCase();
-    if (title) updateData.title = title;
     if (bio) updateData.bio = bio;
-    if (skills) updateData.skills = skills; // Array or JSON
+    if (about) updateData.about = about;
+    if (skills) updateData.skills = skills; // Array
     if (hourlyRate !== undefined) updateData.hourlyRate = hourlyRate;
-    if (location) updateData.location = location;
     if (phone) updateData.phone = phone;
-    if (languages) updateData.languages = languages; // JSON array
-    if (education) updateData.education = education; // JSON array
-    if (experience) updateData.experience = experience; // JSON array
-    if (certifications) updateData.certifications = certifications; // JSON array
-    if (portfolio) updateData.portfolio = portfolio; // JSON array
+    if (languages) updateData.languages = languages; // Array
+    if (education) updateData.education = education; // Text
+    if (certifications) updateData.certifications = certifications; // Text
+    if (portfolio) updateData.portfolio = portfolio; // Text
     if (profileImage) updateData.profileImage = profileImage;
-    if (availability) updateData.availability = availability;
     
     const user = await User.findByIdAndUpdate(userId, updateData, {new: true});
     return res.status(StatusCodes.OK).send(new ApiResponse(StatusCodes.OK, UPDATE_SUCCESS_MESSAGES, { user: user.toJSON() }));

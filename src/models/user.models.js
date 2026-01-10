@@ -16,25 +16,13 @@ export class User {
     this.createdAt = data.created_at;
     this.updatedAt = data.updated_at;
     
-    // Profile fields
-    this.title = data.title;
-    this.bio = data.bio;
-    this.skills = data.skills || [];
-    this.hourlyRate = data.hourly_rate;
-    this.location = data.location;
-    this.phone = data.phone;
-    this.languages = data.languages || [];
-    this.education = data.education || [];
-    this.experience = data.experience || [];
-    this.certifications = data.certifications || [];
-    this.portfolio = data.portfolio || [];
-    this.profileImage = data.profile_image;
-    this.availability = data.availability;
+    // Profile data from joined user_profiles table
+    this.profile = data.profile || null;
   }
 
-  // Convert to plain object
+  // Convert to plain object with profile merged
   toJSON() {
-    return {
+    const baseUser = {
       id: this.id,
       userName: this.userName,
       email: this.email,
@@ -42,21 +30,29 @@ export class User {
       isVerified: this.isVerified,
       createdAt: this.createdAt,
       updatedAt: this.updatedAt,
-      // Profile fields
-      title: this.title,
-      bio: this.bio,
-      skills: this.skills,
-      hourlyRate: this.hourlyRate,
-      location: this.location,
-      phone: this.phone,
-      languages: this.languages,
-      education: this.education,
-      experience: this.experience,
-      certifications: this.certifications,
-      portfolio: this.portfolio,
-      profileImage: this.profileImage,
-      availability: this.availability,
     };
+
+    // Merge profile fields if profile exists
+    if (this.profile) {
+      return {
+        ...baseUser,
+        bio: this.profile.bio,
+        rating: this.profile.rating || 0,
+        reviewsCount: this.profile.reviews_count || 0,
+        projectsCompleted: this.profile.projects_completed || 0,
+        about: this.profile.about,
+        skills: this.profile.skills || [],
+        profileImage: this.profile.profile_image,
+        phone: this.profile.phone,
+        certifications: this.profile.certifications,
+        education: this.profile.education,
+        languages: this.profile.languages || [],
+        hourlyRate: this.profile.hourly_rate,
+        portfolio: this.profile.portfolio,
+      };
+    }
+
+    return baseUser;
   }
 
   // Check password
@@ -84,19 +80,30 @@ export class User {
 
   // Static methods for database operations
   static async findById(id, selectFields = null) {
-    let queryBuilder = supabase
-      .from('f_users')
+    // Get user from users table
+    const { data: userData, error: userError } = await supabase
+      .from('users')
       .select(selectFields || '*')
-      .eq('id', id);
+      .eq('id', id)
+      .single();
     
-    const { data, error } = await queryBuilder.single();
+    if (userError || !userData) return null;
     
-    if (error || !data) return null;
-    return new User(data);
+    // Get profile from user_profiles table
+    const { data: profileData } = await supabase
+      .from('user_profiles')
+      .select('*')
+      .eq('user_id', id)
+      .maybeSingle();
+    
+    return new User({
+      ...userData,
+      profile: profileData
+    });
   }
 
   static async findOne(query, selectFields = null) {
-    let queryBuilder = supabase.from('f_users');
+    let queryBuilder = supabase.from('users');
     
     // Handle select fields (for excluding fields like password)
     if (selectFields) {
@@ -148,9 +155,20 @@ export class User {
       });
     }
     
-    const { data, error } = await queryBuilder.maybeSingle();
-    if (error || !data) return null;
-    return new User(data);
+    const { data: userData, error } = await queryBuilder.maybeSingle();
+    if (error || !userData) return null;
+    
+    // Get profile if user exists
+    const { data: profileData } = await supabase
+      .from('user_profiles')
+      .select('*')
+      .eq('user_id', userData.id)
+      .maybeSingle();
+    
+    return new User({
+      ...userData,
+      profile: profileData
+    });
   }
 
   static async create(userData) {
@@ -162,7 +180,7 @@ export class User {
     const userRole = userData.role && validRoles.includes(userData.role) ? userData.role : 'Freelancer';
     
     const { data, error } = await supabase
-      .from('f_users')
+      .from('users')
       .insert({
         user_name: userData.userName.toLowerCase(),
         email: userData.email,
@@ -176,6 +194,19 @@ export class User {
       .single();
     
     if (error) throw error;
+    
+    // Create empty profile for new user
+    if (data) {
+      await supabase
+        .from('user_profiles')
+        .insert({
+          user_id: data.id,
+          rating: 0,
+          reviews_count: 0,
+          projects_completed: 0
+        });
+    }
+    
     return new User(data);
   }
 
@@ -204,44 +235,112 @@ export class User {
     }
 
     const { data, error } = await supabase
-      .from('f_users')
+      .from('users')
       .update(updateData)
       .eq('id', this.id)
       .select()
       .single();
     
     if (error) throw error;
-    return new User(data);
+    
+    // Get profile to return complete user object
+    const { data: profileData } = await supabase
+      .from('user_profiles')
+      .select('*')
+      .eq('user_id', this.id)
+      .maybeSingle();
+    
+    return new User({
+      ...data,
+      profile: profileData
+    });
   }
 
   static async findByIdAndUpdate(id, updateData, options = {}) {
-    // Convert updateData keys to database column names
-    const dbUpdateData = {};
-    Object.keys(updateData).forEach(key => {
+    // Separate user fields from profile fields
+    const profileFields = [
+      'title', 'bio', 'skills', 'hourlyRate', 'location', 'phone',
+      'languages', 'education', 'experience', 'certifications',
+      'portfolio', 'profileImage', 'availability', 'about'
+    ];
+    
+    const userUpdateData = {};
+    const profileUpdateData = {};
+    
+    // Process update data
+    for (const key of Object.keys(updateData)) {
       if (key === 'userName') {
-        dbUpdateData.user_name = updateData[key];
+        userUpdateData.user_name = updateData[key];
       } else if (key === 'refreshToken') {
-        dbUpdateData.refresh_token = updateData[key];
-      } else if (key === 'hourlyRate') {
-        dbUpdateData.hourly_rate = updateData[key];
-      } else if (key === 'profileImage') {
-        dbUpdateData.profile_image = updateData[key];
-      } else {
-        dbUpdateData[key] = updateData[key];
+        userUpdateData.refresh_token = updateData[key];
+      } else if (key === 'password') {
+        // Hash password if not already hashed
+        if (!updateData[key].startsWith('$2')) {
+          userUpdateData.password = await bcrypt.hash(updateData[key], 10);
+        } else {
+          userUpdateData.password = updateData[key];
+        }
+      } else if (profileFields.includes(key)) {
+        // Map camelCase to snake_case for profile fields
+        if (key === 'hourlyRate') {
+          profileUpdateData.hourly_rate = updateData[key];
+        } else if (key === 'profileImage') {
+          profileUpdateData.profile_image = updateData[key];
+        } else {
+          profileUpdateData[key] = updateData[key];
+        }
       }
-    });
+    }
     
-    dbUpdateData.updated_at = new Date().toISOString();
+    // Update users table
+    if (Object.keys(userUpdateData).length > 0) {
+      userUpdateData.updated_at = new Date().toISOString();
+      
+      const { error: userError } = await supabase
+        .from('users')
+        .update(userUpdateData)
+        .eq('id', id);
+      
+      if (userError) throw userError;
+    }
     
-    const { data, error } = await supabase
-      .from('f_users')
-      .update(dbUpdateData)
-      .eq('id', id)
-      .select()
-      .single();
+    // Update or create user_profiles
+    if (Object.keys(profileUpdateData).length > 0) {
+      profileUpdateData.updated_at = new Date().toISOString();
+      
+      // Check if profile exists
+      const { data: existingProfile } = await supabase
+        .from('user_profiles')
+        .select('id')
+        .eq('user_id', id)
+        .maybeSingle();
+      
+      if (existingProfile) {
+        // Update existing profile
+        const { error: profileError } = await supabase
+          .from('user_profiles')
+          .update(profileUpdateData)
+          .eq('user_id', id);
+        
+        if (profileError) throw profileError;
+      } else {
+        // Create new profile
+        const { error: profileError } = await supabase
+          .from('user_profiles')
+          .insert({
+            user_id: id,
+            rating: 0,
+            reviews_count: 0,
+            projects_completed: 0,
+            ...profileUpdateData
+          });
+        
+        if (profileError) throw profileError;
+      }
+    }
     
-    if (error) throw error;
-    return new User(data);
+    // Return updated user with profile
+    return await User.findById(id);
   }
   
   // Helper method to select specific fields (exclude password, refreshToken)

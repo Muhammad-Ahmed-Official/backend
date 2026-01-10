@@ -98,7 +98,7 @@ async function testOTPVerification() {
       
       try {
         const { data, error } = await supabase
-          .from('f_users')
+          .from('users')
           .select('otp, expires_in, email, id')
           .eq('email', testEmail)
           .order('created_at', { ascending: false })

@@ -14,9 +14,9 @@ async function testConnection() {
   
   try {
     // Test 1: Simple query
-    console.log('Test 1: Querying f_users table...');
+    console.log('Test 1: Querying users table...');
     const { data, error, count } = await supabase
-      .from('f_users')
+      .from('users')
       .select('*', { count: 'exact' })
       .limit(1);
     
@@ -28,14 +28,14 @@ async function testConnection() {
     }
     
     console.log('✅ Connection Successful!');
-    console.log('Table: f_users');
+    console.log('Table: users');
     console.log('Total Records:', count || 0);
     console.log('Sample Data:', data);
     
     // Test 2: Check table structure
     console.log('\nTest 2: Checking table structure...');
     const { data: structureData, error: structureError } = await supabase
-      .from('f_users')
+      .from('users')
       .select('id, user_name, email, is_verified')
       .limit(0);
     

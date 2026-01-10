@@ -16,7 +16,7 @@ async function resendOTP() {
     console.log('Step 1: Fetching user from database...\n');
     
     const { data: userData, error: userError } = await supabase
-      .from('f_users')
+      .from('users')
       .select('id, email, user_name')
       .eq('email', testEmail)
       .order('created_at', { ascending: false })
@@ -60,7 +60,7 @@ async function resendOTP() {
       console.log('\nStep 3: Fetching new OTP from database...\n');
       
       const { data: otpData, error: otpError } = await supabase
-        .from('f_users')
+        .from('users')
         .select('otp, expires_in')
         .eq('id', userData.id)
         .single();
