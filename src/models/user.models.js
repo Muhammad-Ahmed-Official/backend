@@ -8,7 +8,17 @@ export class User {
     this.userName = data.user_name;
     this.email = data.email;
     this.password = data.password;
-    this.role = data.role || 'Freelancer'; // Default role
+    // Only set default role if role is null or undefined, preserve empty string or actual value
+    // Check if role exists and is a valid role, otherwise use default
+    const validRoles = ['Admin', 'Client', 'Freelancer'];
+    if (data.role && validRoles.includes(data.role)) {
+      this.role = data.role;
+    } else if (data.role === null || data.role === undefined) {
+      this.role = 'Freelancer'; // Default only if null/undefined
+    } else {
+      // If role exists but is not valid, use it anyway (might be case issue)
+      this.role = data.role;
+    }
     this.otp = data.otp;
     this.expiresIn = data.expires_in;
     this.isVerified = data.is_verified;

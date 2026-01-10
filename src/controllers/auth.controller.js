@@ -206,7 +206,7 @@ export const signin = asyncHandler(async (req, res) => {
       
     const { accessToken, refreshToken } = await generateAccessAndRefreshToken(user.id);
     
-    const userData = await User.findById(user.id, 'id, user_name, email, is_verified, created_at, updated_at');
+    const userData = await User.findById(user.id, 'id, user_name, email, role, is_verified, created_at, updated_at');
     const loggedInusers = userData ? userData.toJSON() : null;
     
     const options = {
@@ -246,7 +246,7 @@ export const googleSignin = asyncHandler(async (req, res) => {
     
     const { accessToken, refreshToken } = await generateAccessAndRefreshToken(user.id);
     
-    const userData = await User.findById(user.id, 'id, user_name, email, is_verified, created_at, updated_at');
+    const userData = await User.findById(user.id, 'id, user_name, email, role, is_verified, created_at, updated_at');
     const loggedInusers = userData ? userData.toJSON() : null;
     
     const options = {
