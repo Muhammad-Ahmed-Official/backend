@@ -28,6 +28,38 @@ export const getMyProposals = asyncHandler(async (req, res) => {
   );
 });
 
+// Get all proposals for client's projects
+export const getClientProposals = asyncHandler(async (req, res) => {
+  const clientId = req.user.id;
+  
+  // Verify user is a client
+  if (req.user.role !== 'Client') {
+    throw new ApiError(StatusCodes.FORBIDDEN, 'Only clients can access this endpoint');
+  }
+  
+  // Get all projects for this client
+  const projects = await Project.findAll({ clientId });
+  
+  if (projects.length === 0) {
+    return res.status(StatusCodes.OK).send(
+      new ApiResponse(StatusCodes.OK, 'No proposals found', { proposals: [] })
+    );
+  }
+  
+  // Get all proposals for these projects
+  const projectIds = projects.map(p => p.id);
+  console.log('[Backend] Client projects:', projectIds);
+  
+  const allProposals = await Proposal.findByClientProjects(projectIds);
+  console.log('[Backend] Found proposals:', allProposals.length);
+  
+  return res.status(StatusCodes.OK).send(
+    new ApiResponse(StatusCodes.OK, 'Proposals fetched successfully', { 
+      proposals: allProposals.map(p => p.toJSON()) 
+    })
+  );
+});
+
 // Create proposal
 export const createProposal = asyncHandler(async (req, res) => {
   const { projectId } = req.params;
@@ -100,8 +132,13 @@ export const updateProposalStatus = asyncHandler(async (req, res) => {
 
   // If accepted, assign freelancer to project and reject other proposals
   if (status === 'ACCEPTED') {
+    // Update project: assign freelancer and set status to indicate proposal accepted
+    // Status will be ACTIVE (since we only have ACTIVE, COMPLETED, CANCELLED)
+    // Project with freelancerId set means proposal accepted but work not started
     await Project.findByIdAndUpdate(proposal.projectId, { 
       freelancerId: proposal.freelancerId,
+      // Keep status as ACTIVE - project is active but now has assigned freelancer
+      // Frontend can differentiate: if freelancerId exists, it means proposal accepted
     });
 
     // Reject all other proposals for this project

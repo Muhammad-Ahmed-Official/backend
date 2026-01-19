@@ -6,6 +6,11 @@ import swaggerDocs from "./config/swagger.js";
 import authRouter from "./routes/auth.route.js";
 import projectRouter from "./routes/project.route.js";
 import proposalRouter from "./routes/proposal.route.js";
+import walletRouter from "./routes/wallet.route.js";
+import disputeRouter from "./routes/dispute.route.js";
+import notificationRouter from "./routes/notification.route.js";
+import reviewRouter from "./routes/review.route.js";
+import freelancerRouter from "./routes/freelancer.route.js";
 
 
 const app = express();
@@ -56,6 +61,11 @@ swaggerDocs(app);
 app.use("/api/v1/auth", authRouter);
 app.use("/api/v1/projects", projectRouter);
 app.use("/api/v1/proposals", proposalRouter);
+app.use("/api/v1/wallet", walletRouter);
+app.use("/api/v1/disputes", disputeRouter);
+app.use("/api/v1/notifications", notificationRouter);
+app.use("/api/v1/reviews", reviewRouter);
+app.use("/api/v1/freelancers", freelancerRouter);
 // app.use("/api/v1/post", postRouter);
 // app.use("/api/v1/user", userRouter);
 // app.use("/api/v1/comment", commentRouter);

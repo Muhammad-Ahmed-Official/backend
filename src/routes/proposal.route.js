@@ -3,6 +3,7 @@ import { verifyJwt } from '../middleware/auth.middleware.js';
 import {
   getProjectProposals,
   getMyProposals,
+  getClientProposals,
   createProposal,
   updateProposalStatus,
   deleteProposal,
@@ -43,6 +44,22 @@ proposalRouter.route('/project/:projectId').get(verifyJwt, getProjectProposals);
  *         description: Proposals fetched successfully
  */
 proposalRouter.route('/my-proposals').get(verifyJwt, getMyProposals);
+
+/**
+ * @swagger
+ * /api/v1/proposals/client:
+ *   get:
+ *     summary: Get all proposals for client's projects
+ *     tags: [Proposals]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Proposals fetched successfully
+ *       403:
+ *         description: Only clients can access this endpoint
+ */
+proposalRouter.route('/client').get(verifyJwt, getClientProposals);
 
 /**
  * @swagger

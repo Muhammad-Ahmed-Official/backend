@@ -73,6 +73,57 @@ export class Proposal {
     return (data || []).map(item => new Proposal(item));
   }
 
+  static async findByClientProjects(projectIds) {
+    if (!projectIds || projectIds.length === 0) {
+      return [];
+    }
+    
+    // First, get all proposals
+    const { data: proposalsData, error: proposalsError } = await supabase
+      .from('proposals')
+      .select('*')
+      .in('project_id', projectIds)
+      .order('created_at', { ascending: false });
+
+    if (proposalsError) throw proposalsError;
+    if (!proposalsData || proposalsData.length === 0) {
+      return [];
+    }
+
+    // Get unique freelancer IDs and project IDs
+    const freelancerIds = [...new Set(proposalsData.map(p => p.freelancer_id).filter(Boolean))];
+    const uniqueProjectIds = [...new Set(proposalsData.map(p => p.project_id).filter(Boolean))];
+
+    // Fetch freelancers
+    const { data: freelancersData, error: freelancersError } = await supabase
+      .from('users')
+      .select('id, user_name, email, role')
+      .in('id', freelancerIds);
+
+    if (freelancersError) throw freelancersError;
+
+    // Fetch projects
+    const { data: projectsData, error: projectsError } = await supabase
+      .from('projects')
+      .select('id, title, description, budget, status, client_id')
+      .in('id', uniqueProjectIds);
+
+    if (projectsError) throw projectsError;
+
+    // Create lookup maps
+    const freelancersMap = new Map((freelancersData || []).map(f => [f.id, f]));
+    const projectsMap = new Map((projectsData || []).map(p => [p.id, p]));
+
+    // Combine data
+    const proposalsWithRelations = proposalsData.map(proposal => ({
+      ...proposal,
+      freelancer: freelancersMap.get(proposal.freelancer_id) || null,
+      project: projectsMap.get(proposal.project_id) || null,
+    }));
+
+    return proposalsWithRelations.map(item => new Proposal(item));
+  }
+
   static async findByFreelancer(freelancerId) {
     const { data, error } = await supabase
       .from('proposals')
@@ -132,7 +183,18 @@ export class Proposal {
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      // If it's a "not found" error, throw a more descriptive error
+      if (error.code === 'PGRST116' || error.message?.includes('No rows')) {
+        throw new Error('Proposal not found');
+      }
+      throw error;
+    }
+    
+    if (!data) {
+      throw new Error('Proposal not found');
+    }
+    
     return new Proposal(data);
   }
 
