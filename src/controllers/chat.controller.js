@@ -1,0 +1,261 @@
+import { Chat } from '../models/chat.models.js';
+import { User } from '../models/user.models.js';
+import { Project } from '../models/project.models.js';
+
+// Send a new message
+export const sendMessage = async (req, res) => {
+  try {
+    const { receiverId, message, projectId } = req.body;
+    const senderId = req.user._id;
+
+    // Verify that the sender and receiver exist
+    const sender = await User.findById(senderId);
+    const receiver = await User.findById(receiverId);
+
+    if (!sender || !receiver) {
+      return res.status(404).json({
+        success: false,
+        message: 'Sender or receiver not found',
+      });
+    }
+
+    // If project ID is provided, verify the user has access to it
+    if (projectId) {
+      const project = await Project.findById(projectId);
+      if (!project) {
+        return res.status(404).json({
+          success: false,
+          message: 'Project not found',
+        });
+      }
+
+      // Verify that both users have access to the project
+      const hasAccess =
+        project.clientId === senderId ||
+        project.clientId === receiverId ||
+        project.freelancerId === senderId ||
+        project.freelancerId === receiverId;
+
+      if (!hasAccess) {
+        return res.status(403).json({
+          success: false,
+          message: 'You do not have access to this project',
+        });
+      }
+    }
+
+    const chat = await Chat.create({
+      senderId,
+      receiverId,
+      message,
+      projectId,
+    });
+
+    return res.status(201).json({
+      success: true,
+      message: 'Message sent successfully',
+      data: chat,
+    });
+  } catch (error) {
+    console.error('SendMessage error:', error);
+    return res.status(500).json({
+      success: false,
+      message: error.message || 'Something went wrong while sending message',
+    });
+  }
+};
+
+// Get chat messages between two users
+export const getChatMessages = async (req, res) => {
+  try {
+    const { receiverId, projectId } = req.query;
+    const senderId = req.user._id;
+    const { limit = 50, offset = 0 } = req.query;
+
+    if (!receiverId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Receiver ID is required',
+      });
+    }
+
+    // Verify that the receiver exists
+    const receiver = await User.findById(receiverId);
+    if (!receiver) {
+      return res.status(404).json({
+        success: false,
+        message: 'Receiver not found',
+      });
+    }
+
+    // If project ID is provided, verify the user has access to it
+    if (projectId) {
+      const project = await Project.findById(projectId);
+      if (!project) {
+        return res.status(404).json({
+          success: false,
+          message: 'Project not found',
+        });
+      }
+
+      // Verify that both users have access to the project
+      const hasAccess =
+        project.clientId === senderId ||
+        project.clientId === receiverId ||
+        project.freelancerId === senderId ||
+        project.freelancerId === receiverId;
+
+      if (!hasAccess) {
+        return res.status(403).json({
+          success: false,
+          message: 'You do not have access to this project',
+        });
+      }
+    }
+
+    const messages = await Chat.findByParticipants(
+      senderId,
+      receiverId,
+      projectId,
+      parseInt(limit),
+      parseInt(offset)
+    );
+
+    // Mark messages as read for the current user
+    await Chat.markAllAsRead(senderId, receiverId, projectId);
+
+    return res.status(200).json({
+      success: true,
+      message: 'Messages fetched successfully',
+      data: messages,
+    });
+  } catch (error) {
+    console.error('GetChatMessages error:', error);
+    return res.status(500).json({
+      success: false,
+      message: error.message || 'Something went wrong while fetching messages',
+    });
+  }
+};
+
+// Get chat history for a user
+export const getUserChats = async (req, res) => {
+  try {
+    const userId = req.user._id;
+
+    // Get all chats where the user is either sender or receiver
+    const { data: chatData, error } = await req.supabase
+      .from('chats')
+      .select(`
+        *,
+        sender:users!chats_sender_id_fkey(id, user_name, email, role),
+        receiver:users!chats_receiver_id_fkey(id, user_name, email, role),
+        project:projects!chats_project_id_fkey(title)
+      `)
+      .or(`sender_id.eq.${userId},receiver_id.eq.${userId}`)
+      .order('created_at', { ascending: false })
+      .limit(100); // Limit to last 100 conversations
+
+    if (error) throw error;
+
+    // Group chats by participant and get latest message for each
+    const participants = {};
+    const participantIds = new Set();
+
+    chatData.forEach(chat => {
+      const otherUserId = chat.sender_id === userId ? chat.receiver_id : chat.sender_id;
+      participantIds.add(otherUserId);
+
+      if (!participants[otherUserId] || new Date(chat.created_at) > new Date(participants[otherUserId].created_at)) {
+        participants[otherUserId] = {
+          ...chat,
+          otherUser: chat.sender_id === userId ? chat.receiver : chat.sender,
+          latestMessage: chat.message,
+          timestamp: chat.created_at,
+          unread: chat.receiver_id === userId && !chat.read,
+        };
+      }
+    });
+
+    // Get participant details
+    const { data: usersData } = await req.supabase
+      .from('users')
+      .select('id, user_name, email, role')
+      .in('id', Array.from(participantIds));
+
+    const participantsWithDetails = Object.values(participants).map(chat => ({
+      ...chat,
+      otherUser: usersData.find(u => u.id === (chat.sender_id === userId ? chat.receiver_id : chat.sender_id))
+    }));
+
+    return res.status(200).json({
+      success: true,
+      message: 'Chat history fetched successfully',
+      data: participantsWithDetails,
+    });
+  } catch (error) {
+    console.error('GetUserChats error:', error);
+    return res.status(500).json({
+      success: false,
+      message: error.message || 'Something went wrong while fetching chat history',
+    });
+  }
+};
+
+// Mark message as read
+export const markMessageAsRead = async (req, res) => {
+  try {
+    const { messageId } = req.params;
+    const userId = req.user._id;
+
+    const chat = await Chat.findById(messageId);
+    if (!chat) {
+      return res.status(404).json({
+        success: false,
+        message: 'Message not found',
+      });
+    }
+
+    // Verify that the user is the receiver of the message
+    if (chat.receiverId !== userId) {
+      return res.status(403).json({
+        success: false,
+        message: 'You can only mark your received messages as read',
+      });
+    }
+
+    await Chat.markAsRead(messageId);
+
+    return res.status(200).json({
+      success: true,
+      message: 'Message marked as read successfully',
+    });
+  } catch (error) {
+    console.error('MarkMessageAsRead error:', error);
+    return res.status(500).json({
+      success: false,
+      message: error.message || 'Something went wrong while marking message as read',
+    });
+  }
+};
+
+// Get unread messages count
+export const getUnreadCount = async (req, res) => {
+  try {
+    const userId = req.user._id;
+
+    const count = await Chat.getUnreadCount(userId);
+
+    return res.status(200).json({
+      success: true,
+      message: 'Unread count fetched successfully',
+      data: { count },
+    });
+  } catch (error) {
+    console.error('GetUnreadCount error:', error);
+    return res.status(500).json({
+      success: false,
+      message: error.message || 'Something went wrong while fetching unread count',
+    });
+  }
+};
