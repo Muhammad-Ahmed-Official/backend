@@ -13,13 +13,16 @@ import reviewRouter from "./routes/review.route.js";
 import freelancerRouter from "./routes/freelancer.route.js";
 
 
+import adminRouter from "./routes/admin.route.js";
+
+
 const app = express();
 // Middleware Configurations
 app.use(cors({
   origin: function (origin, callback) {
     // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
-    
+
     const allowedOrigins = [
       process.env.ALLOWED_ORIGIN_1,
       process.env.ALLOWED_ORIGIN_2,
@@ -32,7 +35,7 @@ app.use(cors({
       'http://192.168.100.146:8081',
       'http://192.168.100.146:19006',
     ].filter(Boolean);
-    
+
     if (allowedOrigins.indexOf(origin) !== -1 || allowedOrigins.length === 0) {
       callback(null, true);
     } else {
@@ -58,6 +61,9 @@ app.get("/", (req, res) => {
 swaggerDocs(app);
 
 // Routes
+app.get("/api/v1/test-connection", (req, res) => res.json({ message: "Server is reachable!" }));
+app.use("/api/v1/admin", adminRouter);
+
 app.use("/api/v1/auth", authRouter);
 app.use("/api/v1/projects", projectRouter);
 app.use("/api/v1/proposals", proposalRouter);

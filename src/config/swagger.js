@@ -1,5 +1,10 @@
 import swaggerJsdoc from 'swagger-jsdoc';
 import swaggerUiExpress from 'swagger-ui-express';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 const { serve, setup } = swaggerUiExpress;
 
 const options = {
@@ -16,8 +21,8 @@ const options = {
     },
     servers: [
       {
-        url: process.env.VERCEL_URL 
-          ? `https://${process.env.VERCEL_URL}` 
+        url: process.env.VERCEL_URL
+          ? `https://${process.env.VERCEL_URL}`
           : `http://localhost:${process.env.PORT || 3000}`,
         description: process.env.VERCEL_URL ? 'Production server' : 'Development server'
       },
@@ -216,10 +221,17 @@ const options = {
       {
         name: 'Password',
         description: 'Password management endpoints'
+      },
+      {
+        name: 'Admin',
+        description: 'Admin dashboard and management endpoints'
       }
     ]
   },
-  apis: ['./src/routes/*.js', './src/controllers/*.js'] // Path to the API files
+  apis: [
+    path.join(__dirname, '../routes/*.js'),
+    path.join(__dirname, '../controllers/*.js')
+  ]
 };
 
 const swaggerSpec = swaggerJsdoc(options);
@@ -276,7 +288,7 @@ const swaggerDocs = (app) => {
     `;
     res.send(html);
   });
-  
+
   // Keep the serve route for compatibility (though it may not work on Vercel)
   app.use('/api-docs-old', serve, setup(swaggerSpec, {
     customCss: '.swagger-ui .topbar { display: none }',
@@ -302,7 +314,7 @@ const swaggerDocs = (app) => {
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
     res.send(updatedSpec);
   });
-  
+
   // Handle OPTIONS request for CORS preflight
   app.options('/api-docs.json', (req, res) => {
     res.setHeader('Access-Control-Allow-Origin', '*');

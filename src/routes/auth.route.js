@@ -3,7 +3,6 @@ import { changeCurrentPassword, forgotPassword, googleSignin, logout, resendOtp,
 import { verifyJwt } from "../middleware/auth.middleware.js";
 
 const authRouter = Router();
-
 /**
  * @swagger
  * /api/v1/auth/signup:
