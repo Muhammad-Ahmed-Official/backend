@@ -32,7 +32,7 @@ export class Notification {
       .eq('user_id', userId)
       .order('created_at', { ascending: false })
       .limit(limit);
-    
+
     if (error) throw error;
     return (data || []).map(item => new Notification(item));
   }
@@ -43,7 +43,7 @@ export class Notification {
       .select('*', { count: 'exact', head: true })
       .eq('user_id', userId)
       .eq('is_read', false);
-    
+
     if (error) throw error;
     return count || 0;
   }
@@ -53,7 +53,7 @@ export class Notification {
       .from('notifications')
       .update({ is_read: true })
       .eq('id', id);
-    
+
     if (error) throw error;
     return true;
   }
@@ -64,7 +64,7 @@ export class Notification {
       .update({ is_read: true })
       .eq('user_id', userId)
       .eq('is_read', false);
-    
+
     if (error) throw error;
     return true;
   }
@@ -75,8 +75,45 @@ export class Notification {
       .insert(notificationData)
       .select()
       .single();
-    
+
     if (error) throw error;
     return new Notification(data);
+  }
+
+  static async findAll(limit = 100) {
+    const { data, error } = await supabase
+      .from('notifications')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(limit);
+
+    if (error) throw error;
+    return (data || []).map(item => new Notification(item));
+  }
+
+  static async findByIdAndUpdate(id, updateData) {
+    const { data, error } = await supabase
+      .from('notifications')
+      .update({
+        title: updateData.title,
+        message: updateData.message,
+        type: updateData.type
+      })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data ? new Notification(data) : null;
+  }
+
+  static async delete(id) {
+    const { error } = await supabase
+      .from('notifications')
+      .delete()
+      .eq('id', id);
+
+    if (error) throw error;
+    return true;
   }
 }

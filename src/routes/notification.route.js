@@ -1,11 +1,16 @@
 import { Router } from 'express';
 import { verifyJwt } from '../middleware/auth.middleware.js';
-import { 
-  getNotifications, 
+import {
+  getNotifications,
   getUnreadCount,
-  markAsRead, 
-  markAllAsRead 
+  markAsRead,
+  markAllAsRead
 } from '../controllers/notification.controller.js';
+import {
+  sendSystemNotification,
+  updateSystemNotification,
+  deleteSystemNotification
+} from '../controllers/admin.controller.js';
 
 const notificationRouter = Router();
 
@@ -21,7 +26,9 @@ const notificationRouter = Router();
  *       200:
  *         description: Notifications fetched successfully
  */
-notificationRouter.route('/').get(verifyJwt, getNotifications);
+notificationRouter.route('/')
+  .get(verifyJwt, getNotifications)
+  .post(verifyJwt, sendSystemNotification); // Admin Broadcast
 
 /**
  * @swagger
@@ -64,5 +71,10 @@ notificationRouter.route('/:id/read').put(verifyJwt, markAsRead);
  *         description: All notifications marked as read
  */
 notificationRouter.route('/read-all').put(verifyJwt, markAllAsRead);
+
+// Admin Operations (Patch/Delete)
+notificationRouter.route('/:id')
+  .patch(verifyJwt, updateSystemNotification)
+  .delete(verifyJwt, deleteSystemNotification);
 
 export default notificationRouter;

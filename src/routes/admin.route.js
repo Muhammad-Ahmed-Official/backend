@@ -6,7 +6,15 @@ import {
     deleteUser,
     getAllProjects,
     updateProject,
-    deleteProject
+    deleteProject,
+    getServiceCategories,
+    createServiceCategory,
+    updateServiceCategory,
+    deleteServiceCategory,
+    getSystemNotifications,
+    sendSystemNotification,
+    updateSystemNotification,
+    deleteSystemNotification
 } from '../controllers/admin.controller.js';
 import { verifyJwt } from '../middleware/auth.middleware.js';
 
@@ -168,7 +176,18 @@ router.get('/projects', getAllProjects);
  *       200:
  *         description: Project deleted successfully
  */
-router.patch('/projects/:id', updateProject);
 router.delete('/projects/:id', deleteProject);
+
+// --- SERVICES ---
+router.get('/services', getServiceCategories);
+router.post('/services', createServiceCategory);
+router.patch('/services/:id', updateServiceCategory);
+router.delete('/services/:id', deleteServiceCategory);
+
+// --- NOTIFICATIONS ---
+router.get('/notifications', getSystemNotifications);
+router.post('/notifications', sendSystemNotification);
+router.patch('/notifications/:id', updateSystemNotification);
+router.delete('/notifications/:id', deleteSystemNotification);
 
 export default router;
