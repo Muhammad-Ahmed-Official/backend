@@ -1,13 +1,15 @@
 import { User } from "../models/user.models.js";
 import { ApiError } from "../utils/ApiError.js";
-import { ApiResponse } from "../utils/ApiResponse.js"; 
+import { ApiResponse } from "../utils/ApiResponse.js";
 import jwt from "jsonwebtoken";
 import { StatusCodes } from "http-status-codes";
-import { v4 as uuidv4 } from 'uuid'
+import { v4 as uuidv4 } from 'uuid';
 import { sendEmailLink, sendEmailOTP } from '../utils/sendEmail.js';
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { responseMessages } from "../constant/responseMessages.js";
-const { MISSING_FIELDS, USER_EXISTS, UN_AUTHORIZED, SUCCESS_REGISTRATION, NO_USER, SUCCESS_LOGIN, INVALID_OTP, OTP_EXPIRED, EMAIL_VERIFY, SUCCESS_LOGOUT, MISSING_FIELD_EMAIL_PASSWORD, UNAUTHORIZED_REQUEST, GET_SUCCESS_MESSAGES, RESET_LINK_SUCCESS, PASSWORD_CHANGE, NOT_VERIFY, PASSWORD_AND_CONFIRM_NO_MATCH, UPDATE_UNSUCCESS_MESSAGES, MISSING_FIELD_EMAIL, RESET_OTP_SECCESS, INVALID_TOKEN, TOKEN_EXPIRED, SUCCESS_TOKEN, INVALID_DATA, NO_DATA_FOUND, IMAGE_SUCCESS, IMAGE_ERROR , UPDATE_SUCCESS_MESSAGES, UNAUTHORIZED, ERROR_MESSAGES} = responseMessages
+import { supabase } from '../config/supabase.js';
+
+const { MISSING_FIELDS, USER_EXISTS, UN_AUTHORIZED, SUCCESS_REGISTRATION, NO_USER, SUCCESS_LOGIN, INVALID_OTP, OTP_EXPIRED, EMAIL_VERIFY, SUCCESS_LOGOUT, MISSING_FIELD_EMAIL_PASSWORD, UNAUTHORIZED_REQUEST, GET_SUCCESS_MESSAGES, RESET_LINK_SUCCESS, PASSWORD_CHANGE, NOT_VERIFY, PASSWORD_AND_CONFIRM_NO_MATCH, UPDATE_UNSUCCESS_MESSAGES, MISSING_FIELD_EMAIL, RESET_OTP_SECCESS, INVALID_TOKEN, TOKEN_EXPIRED, SUCCESS_TOKEN, INVALID_DATA, NO_DATA_FOUND, IMAGE_SUCCESS, IMAGE_ERROR, UPDATE_SUCCESS_MESSAGES, UNAUTHORIZED, ERROR_MESSAGES } = responseMessages;
 
 const generateAccessAndRefreshToken = async (userId) => {
     try {
@@ -325,12 +327,53 @@ export const updateUser = asyncHandler(async (req, res) => {
     if (portfolio) updateData.portfolio = portfolio; // Text
     if (profileImage) updateData.profileImage = profileImage;
     
-    const user = await User.findByIdAndUpdate(userId, updateData, {new: true});
+    const user = await User.findByIdAndUpdate(userId, updateData, { new: true });
     return res.status(StatusCodes.OK).send(new ApiResponse(StatusCodes.OK, UPDATE_SUCCESS_MESSAGES, { user: user.toJSON() }));
-})
+});
 
+const BUCKET_AVATARS = 'avatars';
+// In Supabase Dashboard: Storage -> New bucket -> name "avatars", set Public bucket = true.
 
+// @desc    Upload profile image -> save to Supabase Storage and DB, return URL
+// @route   POST /api/v1/auth/upload-profile-image
+// @access  Private (multipart: field name "image")
+export const uploadProfileImage = asyncHandler(async (req, res) => {
+    const userId = req.user?.id;
+    if (!userId) {
+        throw new ApiError(StatusCodes.UNAUTHORIZED, UPDATE_UNSUCCESS_MESSAGES);
+    }
+    if (!req.file || !req.file.buffer) {
+        throw new ApiError(StatusCodes.BAD_REQUEST, 'No image file received. Check that the app sends multipart field "image" with the file.');
+    }
+    const ext = (req.file.mimetype === 'image/png') ? 'png' : 'jpg';
+    const path = `${userId}/avatar.${ext}`;
 
+    const { error: uploadError } = await supabase.storage
+        .from(BUCKET_AVATARS)
+        .upload(path, req.file.buffer, {
+            contentType: req.file.mimetype,
+            upsert: true,
+        });
+
+    if (uploadError) {
+        console.error('[uploadProfileImage] Storage upload error:', uploadError.message);
+        throw new ApiError(
+            StatusCodes.INTERNAL_SERVER_ERROR,
+            uploadError.message || 'Storage upload failed. Ensure bucket "avatars" exists and is public, and SUPABASE_SERVICE_ROLE_KEY is set.'
+        );
+    }
+
+    const { data: urlData } = supabase.storage.from(BUCKET_AVATARS).getPublicUrl(path);
+    const profileImageUrl = urlData?.publicUrl || '';
+
+    const user = await User.findByIdAndUpdate(userId, { profileImage: profileImageUrl }, { new: true });
+    if (!user) {
+        throw new ApiError(StatusCodes.INTERNAL_SERVER_ERROR, 'User not found after upload.');
+    }
+    return res.status(StatusCodes.OK).json(
+        new ApiResponse(StatusCodes.OK, IMAGE_SUCCESS || 'Profile image updated.', { user: user.toJSON(), profileImage: profileImageUrl })
+    );
+});
 
 // @desc    LOGOUT
 // @route   POST api/v1/auth/logout
