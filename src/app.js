@@ -11,10 +11,15 @@ import disputeRouter from "./routes/dispute.route.js";
 import notificationRouter from "./routes/notification.route.js";
 import reviewRouter from "./routes/review.route.js";
 import freelancerRouter from "./routes/freelancer.route.js";
+import serviceRouter from "./routes/service.route.js";
 
 
 import adminRouter from "./routes/admin.route.js";
+<<<<<<< HEAD
 import serviceRouter from "./routes/service.route.js";
+=======
+import adminDisputeRouter from "./routes/admin_dispute.route.js";
+>>>>>>> baa216a3f97233b276b874973126bd29cd4ee64a
 
 
 const app = express();
@@ -66,8 +71,13 @@ swaggerDocs(app);
 // Routes
 app.get("/api/v1/test-connection", (req, res) => res.json({ message: "Server is reachable!" }));
 app.use("/api/v1/admin", adminRouter);
+<<<<<<< HEAD
 app.use("/api/v1/services", serviceRouter);
+=======
+app.use("/api/v1/admin/disputes", adminDisputeRouter);
+>>>>>>> baa216a3f97233b276b874973126bd29cd4ee64a
 
+app.use("/api/v1/services", serviceRouter);
 app.use("/api/v1/auth", authRouter);
 app.use("/api/v1/projects", projectRouter);
 app.use("/api/v1/proposals", proposalRouter);

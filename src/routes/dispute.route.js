@@ -1,10 +1,16 @@
 import { Router } from 'express';
 import { verifyJwt } from '../middleware/auth.middleware.js';
-import { 
-  getMyDisputes, 
-  getDisputeById, 
+import {
+  getMyDisputes,
+  getDisputeById,
   createDispute,
-  updateDisputeStatus 
+  updateDisputeStatus,
+  getMessages,
+  sendMessage,
+  getEvidence,
+  uploadEvidence,
+  getTimeline,
+  escalateToSupport
 } from '../controllers/dispute.controller.js';
 
 const disputeRouter = Router();
@@ -64,5 +70,15 @@ disputeRouter.route('/:id').get(verifyJwt, getDisputeById);
  *         description: Dispute status updated successfully
  */
 disputeRouter.route('/:id/status').put(verifyJwt, updateDisputeStatus);
+
+disputeRouter.route('/:id/messages').get(verifyJwt, getMessages);
+disputeRouter.route('/:id/messages').post(verifyJwt, sendMessage);
+
+disputeRouter.route('/:id/evidence').get(verifyJwt, getEvidence);
+disputeRouter.route('/:id/evidence').post(verifyJwt, uploadEvidence);
+
+disputeRouter.route('/:id/timeline').get(verifyJwt, getTimeline);
+
+disputeRouter.route('/:id/escalate').put(verifyJwt, escalateToSupport);
 
 export default disputeRouter;

@@ -5,6 +5,8 @@ import { Project } from '../models/project.models.js';
 import { ApiError } from '../utils/ApiError.js';
 import { ApiResponse } from '../utils/ApiResponse.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
+import { Notification } from '../models/notification.models.js';
+import { ServiceCategory } from '../models/service.models.js';
 
 export const getDashboardStats = asyncHandler(async (req, res) => {
     // 1. Total Freelancers
@@ -153,5 +155,90 @@ export const deleteProject = asyncHandler(async (req, res) => {
 
     return res.status(StatusCodes.OK).json(
         new ApiResponse(StatusCodes.OK, "Project deleted successfully", null)
+    );
+});
+
+// --- SERVICE CATEGORIES ---
+
+export const getServiceCategories = asyncHandler(async (req, res) => {
+    const services = await ServiceCategory.findAll();
+    return res.status(StatusCodes.OK).json(
+        new ApiResponse(StatusCodes.OK, "Service categories fetched successfully", services.map(s => s.toJSON()))
+    );
+});
+
+export const createServiceCategory = asyncHandler(async (req, res) => {
+    const service = await ServiceCategory.create(req.body);
+    return res.status(StatusCodes.CREATED).json(
+        new ApiResponse(StatusCodes.CREATED, "Service category created successfully", service.toJSON())
+    );
+});
+
+export const updateServiceCategory = asyncHandler(async (req, res) => {
+    const { id } = req.params;
+    const service = await ServiceCategory.findByIdAndUpdate(id, req.body);
+    if (!service) throw new ApiError(StatusCodes.NOT_FOUND, "Service category not found");
+    return res.status(StatusCodes.OK).json(
+        new ApiResponse(StatusCodes.OK, "Service category updated successfully", service.toJSON())
+    );
+});
+
+export const deleteServiceCategory = asyncHandler(async (req, res) => {
+    const { id } = req.params;
+    await ServiceCategory.delete(id);
+    return res.status(StatusCodes.OK).json(
+        new ApiResponse(StatusCodes.OK, "Service category deleted successfully", null)
+    );
+});
+
+// --- SYSTEM NOTIFICATIONS ---
+
+export const getSystemNotifications = asyncHandler(async (req, res) => {
+    const notifications = await Notification.findAll();
+    return res.status(StatusCodes.OK).json(
+        new ApiResponse(StatusCodes.OK, "System notifications fetched successfully", notifications.map(n => n.toJSON()))
+    );
+});
+
+export const sendSystemNotification = asyncHandler(async (req, res) => {
+    const { title, message, type } = req.body;
+
+    // 1. Create the base notification entry (historical)
+    // In a real system, you might send this to multiple users or a separate announcement table.
+    // For this implementation, we'll create individual notifications for ALL users if it's a broadcast.
+
+    const { data: users, error: uError } = await supabase.from('users').select('id');
+    if (uError) throw new ApiError(StatusCodes.INTERNAL_SERVER_ERROR, "Error fetching users for broadcast");
+
+    const notifications = users.map(user => ({
+        user_id: user.id,
+        title,
+        message,
+        type: type || 'system',
+        is_read: false
+    }));
+
+    const { error: nError } = await supabase.from('notifications').insert(notifications);
+    if (nError) throw new ApiError(StatusCodes.INTERNAL_SERVER_ERROR, "Error broadcasting notifications");
+
+    return res.status(StatusCodes.OK).json(
+        new ApiResponse(StatusCodes.OK, "Notification broadcasted successfully to all users", null)
+    );
+});
+
+export const updateSystemNotification = asyncHandler(async (req, res) => {
+    const { id } = req.params;
+    const notification = await Notification.findByIdAndUpdate(id, req.body);
+    if (!notification) throw new ApiError(StatusCodes.NOT_FOUND, "Notification not found");
+    return res.status(StatusCodes.OK).json(
+        new ApiResponse(StatusCodes.OK, "Notification updated successfully", notification.toJSON())
+    );
+});
+
+export const deleteSystemNotification = asyncHandler(async (req, res) => {
+    const { id } = req.params;
+    await Notification.delete(id);
+    return res.status(StatusCodes.OK).json(
+        new ApiResponse(StatusCodes.OK, "Notification deleted successfully", null)
     );
 });
