@@ -1,4 +1,6 @@
-import { supabase } from '../config/supabase.js';
+import { supabase, getSupabaseAdmin } from '../config/supabase.js';
+import { ApiError } from '../utils/ApiError.js';
+import { StatusCodes } from 'http-status-codes';
 
 export class Proposal {
   constructor(data) {
@@ -31,41 +33,34 @@ export class Proposal {
     };
   }
 
-  // Static methods
+  // Static methods - use admin client so RLS does not block single proposal fetch/update
   static async findById(id, includeRelations = false) {
-    let query;
-    
-    if (includeRelations) {
-      query = supabase
-        .from('proposals')
-        .select(`
-          *,
-          project:projects!proposals_project_id_fkey(*),
-          freelancer:users!proposals_freelancer_id_fkey(id, user_name, email, role)
-        `)
-        .eq('id', id)
-        .single();
-    } else {
-      query = supabase
-        .from('proposals')
-        .select('*')
-        .eq('id', id)
-        .single();
-    }
-
-    const { data, error } = await query;
-    
+    const client = getSupabaseAdmin();
+    const { data, error } = await client
+      .from('proposals')
+      .select('*')
+      .eq('id', String(id).trim())
+      .single();
     if (error || !data) return null;
-    return new Proposal(data);
+    const proposalData = { ...data };
+    if (includeRelations) {
+      if (data.project_id) {
+        const { data: projectRow } = await client.from('projects').select('*').eq('id', data.project_id).single();
+        proposalData.project = projectRow || null;
+      }
+      if (data.freelancer_id) {
+        const { data: userRow } = await client.from('users').select('id, user_name, email, role').eq('id', data.freelancer_id).single();
+        proposalData.freelancer = userRow || null;
+      }
+    }
+    return new Proposal(proposalData);
   }
 
   static async findByProject(projectId) {
-    const { data, error } = await supabase
+    const client = getSupabaseAdmin();
+    const { data, error } = await client
       .from('proposals')
-      .select(`
-        *,
-        freelancer:users!proposals_freelancer_id_fkey(id, user_name, email, role)
-      `)
+      .select('*')
       .eq('project_id', projectId)
       .order('created_at', { ascending: false });
 
@@ -169,33 +164,29 @@ export class Proposal {
 
   static async findByIdAndUpdate(id, updateData) {
     const dbUpdateData = {};
-    
     if (updateData.coverLetter) dbUpdateData.cover_letter = updateData.coverLetter;
     if (updateData.bidAmount !== undefined) dbUpdateData.bid_amount = updateData.bidAmount;
     if (updateData.status) dbUpdateData.status = updateData.status;
-
     dbUpdateData.updated_at = new Date().toISOString();
 
-    const { data, error } = await supabase
+    const proposalId = String(id).trim();
+    const admin = getSupabaseAdmin();
+
+    const { data: updatedRows, error } = await admin
       .from('proposals')
       .update(dbUpdateData)
-      .eq('id', id)
-      .select()
-      .single();
+      .eq('id', proposalId)
+      .select();
 
     if (error) {
-      // If it's a "not found" error, throw a more descriptive error
-      if (error.code === 'PGRST116' || error.message?.includes('No rows')) {
-        throw new Error('Proposal not found');
-      }
+      console.error('[Proposal] findByIdAndUpdate Supabase error:', { code: error.code, message: error.message, id: proposalId });
       throw error;
     }
-    
-    if (!data) {
-      throw new Error('Proposal not found');
+    if (!updatedRows || updatedRows.length === 0) {
+      console.error('[Proposal] findByIdAndUpdate: update matched 0 rows', { id: proposalId });
+      throw new ApiError(StatusCodes.NOT_FOUND, 'Proposal not found');
     }
-    
-    return new Proposal(data);
+    return new Proposal(updatedRows[0]);
   }
 
   static async delete(id) {

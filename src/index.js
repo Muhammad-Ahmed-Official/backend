@@ -1,7 +1,5 @@
+import "./loadEnv.js";
 import { app } from "./app.js";
-import dotenv from "dotenv";
-
-dotenv.config();
 
 const DEFAULT_PORT = parseInt(process.env.PORT) || 3000;
 const MAX_PORT_ATTEMPTS = 10; // Maximum ports to try (3000-3009)

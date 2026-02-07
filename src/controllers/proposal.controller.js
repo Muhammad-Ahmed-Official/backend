@@ -8,6 +8,18 @@ import { responseMessages } from '../constant/responseMessages.js';
 
 const { UPDATE_SUCCESS_MESSAGES } = responseMessages;
 
+// Get single proposal by ID
+export const getProposalById = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const proposal = await Proposal.findById(id, true);
+  if (!proposal) {
+    throw new ApiError(StatusCodes.NOT_FOUND, 'Proposal not found');
+  }
+  return res.status(StatusCodes.OK).send(
+    new ApiResponse(StatusCodes.OK, 'Proposal fetched successfully', { proposal: proposal.toJSON() })
+  );
+});
+
 // Get proposals for a project
 export const getProjectProposals = asyncHandler(async (req, res) => {
   const { projectId } = req.params;
@@ -117,6 +129,7 @@ export const updateProposalStatus = asyncHandler(async (req, res) => {
   if (!proposal) {
     throw new ApiError(StatusCodes.NOT_FOUND, 'Proposal not found');
   }
+  console.log('[Backend] updateProposalStatus: proposal found', { id, projectId: proposal.projectId });
 
   // Only project owner can accept/reject
   const project = await Project.findById(proposal.projectId);
@@ -128,7 +141,13 @@ export const updateProposalStatus = asyncHandler(async (req, res) => {
     throw new ApiError(StatusCodes.FORBIDDEN, 'Only project owner can update proposal status');
   }
 
-  const updatedProposal = await Proposal.findByIdAndUpdate(id, { status });
+  let updatedProposal;
+  try {
+    updatedProposal = await Proposal.findByIdAndUpdate(id, { status });
+  } catch (err) {
+    console.error('[Backend] findByIdAndUpdate failed:', err.message, { id, status });
+    throw err;
+  }
 
   // If accepted, assign freelancer to project and reject other proposals
   if (status === 'ACCEPTED') {
