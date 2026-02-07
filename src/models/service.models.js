@@ -4,7 +4,6 @@ export class ServiceCategory {
     constructor(data) {
         this.id = data.id;
         this.name = data.name;
-        this.icon = data.icon;
         this.image = data.image; // Background image URL
         this.color = data.color; // Theme color
         this.createdAt = data.created_at;
@@ -14,7 +13,6 @@ export class ServiceCategory {
         return {
             id: this.id,
             name: this.name,
-            icon: this.icon,
             image: this.image,
             color: this.color,
             createdAt: this.createdAt,
@@ -34,8 +32,6 @@ export class ServiceCategory {
     static async create(serviceData) {
         const payload = {};
         if (serviceData.name != null) payload.name = serviceData.name;
-        // icon from UI; DB NOT NULL so use empty string when not provided
-        payload.icon = serviceData.icon != null && serviceData.icon !== '' ? serviceData.icon : '';
         if (serviceData.image != null) payload.image = serviceData.image;
 
         const { data, error } = await supabase
@@ -51,7 +47,6 @@ export class ServiceCategory {
     static async findByIdAndUpdate(id, updateData) {
         const payload = {};
         if (updateData.name != null) payload.name = updateData.name;
-        if (updateData.icon != null) payload.icon = updateData.icon;
         if (updateData.image != null) payload.image = updateData.image;
         // color theme option removed from UI; do not update color from request
         if (Object.keys(payload).length === 0) return null;
