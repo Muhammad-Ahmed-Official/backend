@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { verifyJwt } from '../middleware/auth.middleware.js';
 import {
+  getProposalById,
   getProjectProposals,
   getMyProposals,
   getClientProposals,
@@ -127,6 +128,28 @@ proposalRouter.route('/project/:projectId').post(verifyJwt, createProposal);
  *         description: Only project owner can update proposal status
  */
 proposalRouter.route('/:id/status').put(verifyJwt, updateProposalStatus);
+
+/**
+ * @swagger
+ * /api/v1/proposals/{id}:
+ *   get:
+ *     summary: Get single proposal by ID
+ *     tags: [Proposals]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Proposal fetched successfully
+ *       404:
+ *         description: Proposal not found
+ */
+proposalRouter.get('/:id', verifyJwt, getProposalById);
 
 /**
  * @swagger

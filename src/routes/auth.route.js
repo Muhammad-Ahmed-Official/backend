@@ -1,8 +1,10 @@
 import { Router } from "express";
-import { changeCurrentPassword, forgotPassword, googleSignin, logout, resendOtp, signin, signup, verifyEmail, getUserInfo, updateUser, refreshAccessToken, getCurrentUser } from "../controllers/auth.controller.js";
+import multer from "multer";
+import { changeCurrentPassword, forgotPassword, googleSignin, logout, resendOtp, signin, signup, verifyEmail, getUserInfo, updateUser, refreshAccessToken, getCurrentUser, uploadProfileImage } from "../controllers/auth.controller.js";
 import { verifyJwt } from "../middleware/auth.middleware.js";
 
 const authRouter = Router();
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 4 * 1024 * 1024 } }); // 4MB max (Vercel body limit 4.5MB)
 /**
  * @swagger
  * /api/v1/auth/signup:
@@ -279,6 +281,8 @@ authRouter.route("/isUser").post(verifyJwt, getUserInfo);
  *         description: Unauthorized
  */
 authRouter.route("/update-user").post(verifyJwt, updateUser);
+
+authRouter.route("/upload-profile-image").post(verifyJwt, upload.single("image"), uploadProfileImage);
 
 /**
  * @swagger

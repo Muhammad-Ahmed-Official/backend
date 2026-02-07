@@ -36,6 +36,8 @@ app.use(cors({
       'http://localhost:8080',
       'http://192.168.100.146:8081',
       'http://192.168.100.146:19006',
+      'http://10.0.11.195:8081',
+      'http://10.0.11.195:3000',
     ].filter(Boolean);
 
     if (allowedOrigins.indexOf(origin) !== -1 || allowedOrigins.length === 0) {
@@ -66,7 +68,6 @@ swaggerDocs(app);
 app.get("/api/v1/test-connection", (req, res) => res.json({ message: "Server is reachable!" }));
 app.use("/api/v1/admin", adminRouter);
 app.use("/api/v1/admin/disputes", adminDisputeRouter);
-
 app.use("/api/v1/services", serviceRouter);
 app.use("/api/v1/auth", authRouter);
 app.use("/api/v1/projects", projectRouter);
