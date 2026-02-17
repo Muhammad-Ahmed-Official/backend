@@ -4,11 +4,18 @@ import {
   sendMessage,
   getChatMessages,
   getUserChats,
+  getChatUsers,
+  getChatUserProfile,
   markMessageAsRead,
   getUnreadCount,
+  deleteMessage,
+  updateMessage,
 } from '../controllers/chat.controller.js';
 
 const chatRouter = Router();
+
+// Profile route first (static path) so it always matches
+chatRouter.get('/profile/:userId', verifyJwt, getChatUserProfile);
 
 /**
  * @swagger
@@ -88,6 +95,39 @@ chatRouter.route('/history').get(verifyJwt, getUserChats);
 
 /**
  * @swagger
+ * /api/v1/chats/unread-count:
+ *   get:
+ *     summary: Get unread messages count
+ *     tags: [Chats]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Unread count fetched successfully
+ */
+chatRouter.route('/unread-count').get(verifyJwt, getUnreadCount);
+
+/**
+ * @swagger
+ * /api/v1/chats/users:
+ *   get:
+ *     summary: Get users for chat search (all except current user)
+ *     tags: [Chats]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Users list with role
+ */
+chatRouter.route('/users').get(verifyJwt, getChatUsers);
+
+/**
+ * @swagger
  * /api/v1/chats/{messageId}/read:
  *   patch:
  *     summary: Mark message as read
@@ -106,18 +146,6 @@ chatRouter.route('/history').get(verifyJwt, getUserChats);
  */
 chatRouter.route('/:messageId/read').patch(verifyJwt, markMessageAsRead);
 
-/**
- * @swagger
- * /api/v1/chats/unread-count:
- *   get:
- *     summary: Get unread messages count
- *     tags: [Chats]
- *     security:
- *       - bearerAuth: []
- *     responses:
- *       200:
- *         description: Unread count fetched successfully
- */
-chatRouter.route('/unread-count').get(verifyJwt, getUnreadCount);
+chatRouter.route('/:messageId').delete(verifyJwt, deleteMessage).patch(verifyJwt, updateMessage);
 
 export default chatRouter;

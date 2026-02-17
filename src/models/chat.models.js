@@ -89,7 +89,7 @@ export class Chat {
         sender_id: chatData.senderId,
         receiver_id: chatData.receiverId,
         message: chatData.message,
-        project_id: chatData.projectId,
+        project_id: chatData.projectId ?? null,
         read: false,
       })
       .select(`
@@ -101,6 +101,26 @@ export class Chat {
 
     if (error) throw error;
     return new Chat(data);
+  }
+
+  static async deleteById(id) {
+    const { error } = await supabase
+      .from('chats')
+      .delete()
+      .eq('id', id);
+    if (error) throw error;
+    return true;
+  }
+
+  static async updateMessageById(id, message) {
+    const { data, error } = await supabase
+      .from('chats')
+      .update({ message, updated_at: new Date().toISOString() })
+      .eq('id', id)
+      .select()
+      .maybeSingle();
+    if (error) throw error;
+    return data ? new Chat(data) : null;
   }
 
   static async markAsRead(chatId) {

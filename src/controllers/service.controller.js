@@ -3,22 +3,17 @@ import { supabase } from '../config/supabase.js';
 import { ApiError } from '../utils/ApiError.js';
 import { ApiResponse } from '../utils/ApiResponse.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
+import { ServiceCategory } from '../models/service.models.js';
 
 const TABLE = 'service_categories';
 const SELECT_COLS = 'id, created_at, name, icon, image';
 
+// Public GET: fetch from service_categories via ServiceCategory model (single source of truth)
 export const getServiceCategories = asyncHandler(async (req, res) => {
-    const { data, error } = await supabase
-        .from(TABLE)
-        .select(SELECT_COLS)
-        .order('created_at', { ascending: true });
-
-    if (error) {
-        throw new ApiError(StatusCodes.INTERNAL_SERVER_ERROR, 'Error fetching service categories');
-    }
-
+    const categories = await ServiceCategory.findAll();
+    const data = categories.map(c => c.toJSON());
     return res.status(StatusCodes.OK).json(
-        new ApiResponse(StatusCodes.OK, 'Service categories fetched successfully', data || [])
+        new ApiResponse(StatusCodes.OK, 'Service categories fetched successfully', data)
     );
 });
 

@@ -1,12 +1,13 @@
 import { Chat } from '../models/chat.models.js';
 import { User } from '../models/user.models.js';
 import { Project } from '../models/project.models.js';
+import { supabase } from '../config/supabase.js';
 
 // Send a new message
 export const sendMessage = async (req, res) => {
   try {
     const { receiverId, message, projectId } = req.body;
-    const senderId = req.user._id;
+    const senderId = req.user.id || req.user._id;
 
     // Verify that the sender and receiver exist
     const sender = await User.findById(senderId);
@@ -51,6 +52,23 @@ export const sendMessage = async (req, res) => {
       projectId,
     });
 
+    const io = req.app.get('io');
+    const receiverRoom = String(receiverId).trim();
+    const senderRoom = String(senderId).trim();
+    const payload = {
+      id: chat.id,
+      sender: senderRoom,
+      receiver: receiverRoom,
+      message: chat.message,
+      projectId: chat.projectId || null,
+      createdAt: chat.createdAt,
+      updatedAt: chat.updatedAt,
+    };
+    if (io) {
+      io.to(receiverRoom).emit('newMessage', payload);
+      io.to(senderRoom).emit('newMessage', payload);
+    }
+
     return res.status(201).json({
       success: true,
       message: 'Message sent successfully',
@@ -69,7 +87,7 @@ export const sendMessage = async (req, res) => {
 export const getChatMessages = async (req, res) => {
   try {
     const { receiverId, projectId } = req.query;
-    const senderId = req.user._id;
+    const senderId = req.user.id || req.user._id;
     const { limit = 50, offset = 0 } = req.query;
 
     if (!receiverId) {
@@ -124,10 +142,28 @@ export const getChatMessages = async (req, res) => {
     // Mark messages as read for the current user
     await Chat.markAllAsRead(senderId, receiverId, projectId);
 
+    const userIds = new Set();
+    messages.forEach(m => {
+      userIds.add(m.senderId);
+      userIds.add(m.receiverId);
+    });
+    const { data: profilesData } = await supabase
+      .from('user_profiles')
+      .select('user_id, profile_image')
+      .in('user_id', Array.from(userIds));
+    const profileMap = new Map((profilesData || []).map(p => [p.user_id, p.profile_image]));
+
+    const data = messages.map(m => {
+      const json = m.toJSON ? m.toJSON() : m;
+      if (json.sender) json.sender.profile_image = profileMap.get(m.senderId) || null;
+      if (json.receiver) json.receiver.profile_image = profileMap.get(m.receiverId) || null;
+      return json;
+    });
+
     return res.status(200).json({
       success: true,
       message: 'Messages fetched successfully',
-      data: messages,
+      data,
     });
   } catch (error) {
     console.error('GetChatMessages error:', error);
@@ -138,13 +174,119 @@ export const getChatMessages = async (req, res) => {
   }
 };
 
+// Get one user's profile for chat header (id, user_name, profile_image)
+export const getChatUserProfile = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const currentUserId = req.user.id || req.user._id;
+    if (!userId) {
+      return res.status(400).json({ success: false, message: 'User ID is required' });
+    }
+    if (userId === currentUserId) {
+      return res.status(400).json({ success: false, message: 'Cannot fetch own profile via this endpoint' });
+    }
+
+    const { data: userRow, error: userError } = await supabase
+      .from('users')
+      .select('id, user_name, email, role')
+      .eq('id', userId)
+      .single();
+
+    if (userError || !userRow) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    const { data: profileRow } = await supabase
+      .from('user_profiles')
+      .select('profile_image')
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    const profile_image = profileRow?.profile_image ?? null;
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        id: userRow.id,
+        user_name: userRow.user_name,
+        email: userRow.email,
+        role: userRow.role || 'Freelancer',
+        profile_image,
+      },
+    });
+  } catch (error) {
+    console.error('GetChatUserProfile error:', error);
+    return res.status(500).json({
+      success: false,
+      message: error.message || 'Something went wrong',
+    });
+  }
+};
+
+// Get users for chat search (all except current user, with optional search)
+export const getChatUsers = async (req, res) => {
+  try {
+    const userId = req.user.id || req.user._id;
+    const search = (req.query.search || '').trim();
+
+    let query = supabase
+      .from('users')
+      .select('id, user_name, email, role')
+      .neq('id', userId);
+
+    if (search) {
+      query = query.ilike('user_name', `%${search}%`);
+    }
+
+    const { data: usersData, error } = await query.order('user_name').limit(50);
+
+    if (error) throw error;
+
+    const userIds = (usersData || []).map(u => u.id);
+    if (userIds.length === 0) {
+      return res.status(200).json({
+        success: true,
+        message: 'Users fetched successfully',
+        data: [],
+      });
+    }
+
+    const { data: profilesData } = await supabase
+      .from('user_profiles')
+      .select('user_id, profile_image')
+      .in('user_id', userIds);
+
+    const profileMap = new Map((profilesData || []).map(p => [p.user_id, p.profile_image]));
+
+    const users = (usersData || []).map(u => ({
+      id: u.id,
+      user_name: u.user_name,
+      email: u.email,
+      role: u.role || 'Freelancer',
+      profile_image: profileMap.get(u.id) || null,
+    }));
+
+    return res.status(200).json({
+      success: true,
+      message: 'Users fetched successfully',
+      data: users,
+    });
+  } catch (error) {
+    console.error('GetChatUsers error:', error);
+    return res.status(500).json({
+      success: false,
+      message: error.message || 'Something went wrong while fetching users',
+    });
+  }
+};
+
 // Get chat history for a user
 export const getUserChats = async (req, res) => {
   try {
-    const userId = req.user._id;
+    const userId = req.user.id || req.user._id;
 
     // Get all chats where the user is either sender or receiver
-    const { data: chatData, error } = await req.supabase
+    const { data: chatData, error } = await supabase
       .from('chats')
       .select(`
         *,
@@ -177,16 +319,25 @@ export const getUserChats = async (req, res) => {
       }
     });
 
-    // Get participant details
-    const { data: usersData } = await req.supabase
+    // Get participant details and profile images
+    const { data: usersData } = await supabase
       .from('users')
       .select('id, user_name, email, role')
       .in('id', Array.from(participantIds));
 
-    const participantsWithDetails = Object.values(participants).map(chat => ({
-      ...chat,
-      otherUser: usersData.find(u => u.id === (chat.sender_id === userId ? chat.receiver_id : chat.sender_id))
-    }));
+    const { data: profilesData } = await supabase
+      .from('user_profiles')
+      .select('user_id, profile_image')
+      .in('user_id', Array.from(participantIds));
+    const profileMap = new Map((profilesData || []).map(p => [p.user_id, p.profile_image]));
+
+    const usersList = usersData || [];
+    const participantsWithDetails = Object.values(participants).map(chat => {
+      const otherId = chat.sender_id === userId ? chat.receiver_id : chat.sender_id;
+      const otherUser = usersList.find(u => u.id === otherId);
+      const otherWithProfile = otherUser ? { ...otherUser, profile_image: profileMap.get(otherId) || null } : null;
+      return { ...chat, otherUser: otherWithProfile };
+    });
 
     return res.status(200).json({
       success: true,
@@ -206,7 +357,7 @@ export const getUserChats = async (req, res) => {
 export const markMessageAsRead = async (req, res) => {
   try {
     const { messageId } = req.params;
-    const userId = req.user._id;
+    const userId = req.user.id || req.user._id;
 
     const chat = await Chat.findById(messageId);
     if (!chat) {
@@ -242,7 +393,7 @@ export const markMessageAsRead = async (req, res) => {
 // Get unread messages count
 export const getUnreadCount = async (req, res) => {
   try {
-    const userId = req.user._id;
+    const userId = req.user.id || req.user._id;
 
     const count = await Chat.getUnreadCount(userId);
 
@@ -256,6 +407,93 @@ export const getUnreadCount = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: error.message || 'Something went wrong while fetching unread count',
+    });
+  }
+};
+
+// Delete a message (sender or receiver). Emit to both for real-time.
+export const deleteMessage = async (req, res) => {
+  try {
+    const { messageId } = req.params;
+    const userId = String(req.user.id || req.user._id).trim();
+
+    const chat = await Chat.findById(messageId);
+    if (!chat) {
+      return res.status(404).json({ success: false, message: 'Message not found' });
+    }
+
+    const senderRoom = String(chat.senderId).trim();
+    const receiverRoom = String(chat.receiverId).trim();
+    if (userId !== senderRoom && userId !== receiverRoom) {
+      return res.status(403).json({ success: false, message: 'You can only delete messages in your conversations' });
+    }
+
+    await Chat.deleteById(messageId);
+
+    const io = req.app.get('io');
+    if (io) {
+      io.to(receiverRoom).emit('deleteMsg', messageId);
+      io.to(senderRoom).emit('deleteMsg', messageId);
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: 'Message deleted successfully',
+    });
+  } catch (error) {
+    console.error('DeleteMessage error:', error);
+    return res.status(500).json({
+      success: false,
+      message: error.message || 'Something went wrong',
+    });
+  }
+};
+
+// Update a message (sender only). Emit to both for real-time.
+export const updateMessage = async (req, res) => {
+  try {
+    const { messageId } = req.params;
+    const { message } = req.body;
+    const userId = String(req.user.id || req.user._id).trim();
+
+    if (!message || typeof message !== 'string' || !message.trim()) {
+      return res.status(400).json({ success: false, message: 'Message text is required' });
+    }
+
+    const chat = await Chat.findById(messageId);
+    if (!chat) {
+      return res.status(404).json({ success: false, message: 'Message not found' });
+    }
+
+    if (userId !== String(chat.senderId).trim()) {
+      return res.status(403).json({ success: false, message: 'Only the sender can edit this message' });
+    }
+
+    const updated = await Chat.updateMessageById(messageId, message.trim());
+    if (!updated) {
+      return res.status(500).json({ success: false, message: 'Update failed' });
+    }
+
+    const senderRoom = String(chat.senderId).trim();
+    const receiverRoom = String(chat.receiverId).trim();
+    const payload = { messageId, message: updated.message, receiver: receiverRoom, sender: senderRoom };
+
+    const io = req.app.get('io');
+    if (io) {
+      io.to(receiverRoom).emit('editMsg', payload);
+      io.to(senderRoom).emit('editMsg', payload);
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: 'Message updated successfully',
+      data: updated,
+    });
+  } catch (error) {
+    console.error('UpdateMessage error:', error);
+    return res.status(500).json({
+      success: false,
+      message: error.message || 'Something went wrong',
     });
   }
 };

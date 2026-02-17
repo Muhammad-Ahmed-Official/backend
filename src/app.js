@@ -16,6 +16,13 @@ import serviceRouter from "./routes/service.route.js";
 
 import adminRouter from "./routes/admin.route.js";
 import adminDisputeRouter from "./routes/admin_dispute.route.js";
+import chatRouter from "./routes/chat.route.js";
+import { verifyJwt } from "./middleware/auth.middleware.js";
+import {
+  getChatUserProfile,
+  deleteMessage,
+  updateMessage,
+} from "./controllers/chat.controller.js";
 
 
 const app = express();
@@ -77,6 +84,10 @@ app.use("/api/v1/disputes", disputeRouter);
 app.use("/api/v1/notifications", notificationRouter);
 app.use("/api/v1/reviews", reviewRouter);
 app.use("/api/v1/freelancers", freelancerRouter);
+app.get("/api/v1/chats/profile/:userId", verifyJwt, getChatUserProfile);
+app.delete("/api/v1/chats/:messageId", verifyJwt, deleteMessage);
+app.patch("/api/v1/chats/:messageId", verifyJwt, updateMessage);
+app.use("/api/v1/chats", chatRouter);
 // app.use("/api/v1/post", postRouter);
 // app.use("/api/v1/user", userRouter);
 // app.use("/api/v1/comment", commentRouter);
