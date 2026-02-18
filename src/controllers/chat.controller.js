@@ -53,8 +53,8 @@ export const sendMessage = async (req, res) => {
     });
 
     const io = req.app.get('io');
-    const receiverRoom = String(receiverId).trim();
-    const senderRoom = String(senderId).trim();
+    const receiverRoom = String(chat.receiverId ?? receiverId).trim().toLowerCase();
+    const senderRoom = String(chat.senderId ?? senderId).trim().toLowerCase();
     const payload = {
       id: chat.id,
       sender: senderRoom,
@@ -67,6 +67,8 @@ export const sendMessage = async (req, res) => {
     if (io) {
       io.to(receiverRoom).emit('newMessage', payload);
       io.to(senderRoom).emit('newMessage', payload);
+    } else {
+      console.warn('[Chat] Socket.IO not available - real-time emit skipped. Receiver will get message via polling or refresh.');
     }
 
     return res.status(201).json({
@@ -139,8 +141,19 @@ export const getChatMessages = async (req, res) => {
       parseInt(offset)
     );
 
-    // Mark messages as read for the current user
-    await Chat.markAllAsRead(senderId, receiverId, projectId);
+    // Mark messages as read for the current user and notify sender in real-time
+    const markedMessages = await Chat.markAllAsRead(senderId, receiverId, projectId);
+    if (markedMessages.length > 0) {
+      const io = req.app.get('io');
+      if (io) {
+        const senderRoom = String(receiverId).trim().toLowerCase();
+        io.to(senderRoom).emit('messagesSeen', {
+          by: String(senderId).trim().toLowerCase(),
+          messageIds: markedMessages.map(m => m.id),
+          seenAt: new Date().toISOString(),
+        });
+      }
+    }
 
     const userIds = new Set();
     messages.forEach(m => {

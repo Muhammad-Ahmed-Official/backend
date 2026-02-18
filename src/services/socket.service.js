@@ -1,5 +1,6 @@
 import { Server } from 'socket.io';
 import { Chat } from '../models/chat.models.js';
+import { supabase } from '../config/supabase.js';
 
 /**
  * SocketService - Real-time chat over Socket.io.
@@ -21,7 +22,7 @@ export class SocketService {
 
     io.on('connection', (socket) => {
       const rawUserId = socket.handshake?.query?.userId;
-      const userId = rawUserId != null ? String(rawUserId).trim() : '';
+      const userId = rawUserId != null ? String(rawUserId).trim().toLowerCase() : '';
       if (!userId) {
         console.log(`Socket connected without userId: ${socket.id}`);
         return;
@@ -118,6 +119,33 @@ export class SocketService {
         } catch (err) {
           console.error('Edit message failed:', err.message);
         }
+      });
+
+      // Real-time seen receipts: receiver tells sender their messages have been seen
+      socket.on('messagesSeen', async (data) => {
+        const { sender, receiver, messageIds } = data || {};
+        if (!sender || !receiver) return;
+        // sender = the person who SENT the original messages (will receive the seen notification)
+        // receiver = the person who SAW the messages (current user)
+        try {
+          if (messageIds && messageIds.length > 0) {
+            const now = new Date().toISOString();
+            await supabase
+              .from('chats')
+              .update({ read: true, seen_at: now })
+              .in('id', messageIds)
+              .eq('sender_id', sender)
+              .eq('receiver_id', receiver);
+          }
+        } catch (err) {
+          console.error('messagesSeen DB update failed:', err.message);
+        }
+        // Notify the original sender that their messages were seen
+        io.to(sender).emit('messagesSeen', {
+          by: receiver,
+          messageIds: messageIds || [],
+          seenAt: new Date().toISOString(),
+        });
       });
 
       socket.on('startTyping', ({ sender, receiver }) => {

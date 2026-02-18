@@ -1,5 +1,14 @@
 import { supabase } from '../config/supabase.js';
 
+// Map filter chip names (Search UI) to DB category values (Create Project)
+const CATEGORY_FILTER_MAP = {
+  Design: ['Design', 'Graphic Design', 'UI/UX Design'],
+  Development: ['Development', 'Web Development', 'Mobile Development', 'DevOps', 'Quality Assurance'],
+  Writing: ['Writing', 'Content Writing'],
+  Marketing: ['Marketing', 'Digital Marketing'],
+  Data: ['Data', 'Data Science'],
+};
+
 export class Project {
   constructor(data) {
     this.id = data.id;
@@ -102,16 +111,45 @@ export class Project {
       query = query.eq('freelancer_id', filters.freelancerId);
     }
     if (filters.category) {
-      query = query.eq('category', filters.category);
+      const cat = String(filters.category).trim();
+      if (cat) {
+        const allowed = CATEGORY_FILTER_MAP[cat];
+        if (Array.isArray(allowed) && allowed.length > 0) {
+          query = query.in('category', allowed);
+        } else {
+          query = query.ilike('category', `%${cat}%`);
+        }
+      }
     }
     if (filters.search) {
       query = query.or(`title.ilike.%${filters.search}%,description.ilike.%${filters.search}%`);
     }
 
     const { data, error } = await query;
-    
     if (error) throw error;
-    return (data || []).map(item => new Project(item));
+    let list = (data || []).map((item) => new Project(item));
+
+    // If filtering by chip and we got no results, include null-category projects whose title/desc matches (e.g. "2D Graphic Designer")
+    if (filters.category && list.length === 0) {
+      const cat = String(filters.category).trim().toLowerCase();
+      let fallbackQuery = supabase
+        .from('projects')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .is('category', null);
+      if (filters.status) fallbackQuery = fallbackQuery.eq('status', filters.status);
+      if (filters.clientId) fallbackQuery = fallbackQuery.eq('client_id', filters.clientId);
+      if (filters.freelancerId) fallbackQuery = fallbackQuery.eq('freelancer_id', filters.freelancerId);
+      const { data: nullCatData } = await fallbackQuery;
+      const keyword = cat;
+      const fromNull = (nullCatData || []).filter((row) => {
+        const title = (row.title || '').toLowerCase();
+        const desc = (row.description || '').toLowerCase();
+        return title.includes(keyword) || desc.includes(keyword);
+      });
+      list = fromNull.map((item) => new Project(item));
+    }
+    return list;
   }
 
   static async create(projectData) {

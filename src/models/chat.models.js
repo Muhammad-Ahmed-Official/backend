@@ -8,6 +8,7 @@ export class Chat {
     this.message = data.message;
     this.projectId = data.project_id;
     this.read = data.read || false;
+    this.seenAt = data.seen_at || null;
     this.createdAt = data.created_at;
     this.updatedAt = data.updated_at;
 
@@ -24,6 +25,7 @@ export class Chat {
       message: this.message,
       projectId: this.projectId,
       read: this.read,
+      seenAt: this.seenAt,
       createdAt: this.createdAt,
       updatedAt: this.updatedAt,
       sender: this.sender,
@@ -134,9 +136,10 @@ export class Chat {
   }
 
   static async markAllAsRead(senderId, receiverId, projectId = null) {
+    const now = new Date().toISOString();
     let query = supabase
       .from('chats')
-      .update({ read: true })
+      .update({ read: true, seen_at: now })
       .eq('receiver_id', senderId)
       .eq('sender_id', receiverId)
       .eq('read', false);
@@ -145,10 +148,11 @@ export class Chat {
       query = query.eq('project_id', projectId);
     }
 
-    const { error } = await query;
+    // Return the updated rows so we know which messages were marked
+    const { data, error } = await query.select('id, sender_id');
 
     if (error) throw error;
-    return true;
+    return data || [];
   }
 
   static async getUnreadCount(userId) {

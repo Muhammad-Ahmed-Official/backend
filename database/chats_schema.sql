@@ -10,6 +10,7 @@ CREATE TABLE IF NOT EXISTS chats (
   message TEXT NOT NULL,
   project_id UUID REFERENCES projects(id) ON DELETE SET NULL,
   read BOOLEAN DEFAULT false,
+  seen_at TIMESTAMPTZ DEFAULT NULL,
   created_at TIMESTAMPTZ DEFAULT now(),
   updated_at TIMESTAMPTZ DEFAULT now()
 );
