@@ -102,9 +102,9 @@ export class Project {
       .select('*')
       .order('created_at', { ascending: false });
 
-    // Apply filters
+    // Apply filters (case-insensitive status match)
     if (filters.status) {
-      query = query.eq('status', filters.status);
+      query = query.ilike('status', filters.status);
     }
     if (filters.clientId) {
       query = query.eq('client_id', filters.clientId);
@@ -129,7 +129,35 @@ export class Project {
 
     const { data, error } = await query;
     if (error) throw error;
-    let list = (data || []).map((item) => new Project(item));
+    
+    // Collect unique user IDs to fetch
+    const clientIds = [...new Set((data || []).map(p => p.client_id).filter(Boolean))];
+    const freelancerIds = [...new Set((data || []).map(p => p.freelancer_id).filter(Boolean))];
+    const allUserIds = [...new Set([...clientIds, ...freelancerIds])];
+    
+    // Fetch users in one query
+    let usersMap = {};
+    if (allUserIds.length > 0) {
+      const { data: usersData } = await supabase
+        .from('users')
+        .select('id, user_name, email')
+        .in('id', allUserIds);
+      
+      (usersData || []).forEach(user => {
+        usersMap[user.id] = { id: user.id, userName: user.user_name, email: user.email };
+      });
+    }
+    
+    let list = (data || []).map((item) => {
+      const project = new Project(item);
+      if (item.client_id && usersMap[item.client_id]) {
+        project.client = usersMap[item.client_id];
+      }
+      if (item.freelancer_id && usersMap[item.freelancer_id]) {
+        project.freelancer = usersMap[item.freelancer_id];
+      }
+      return project;
+    });
 
     // If filtering by chip and we got no results, include null-category projects whose title/desc matches (e.g. "2D Graphic Designer")
     if (filters.category && list.length === 0) {
@@ -149,7 +177,34 @@ export class Project {
         const desc = (row.description || '').toLowerCase();
         return title.includes(keyword) || desc.includes(keyword);
       });
-      list = fromNull.map((item) => new Project(item));
+      
+      // Fetch users for fallback results
+      const fbClientIds = [...new Set(fromNull.map(p => p.client_id).filter(Boolean))];
+      const fbFreelancerIds = [...new Set(fromNull.map(p => p.freelancer_id).filter(Boolean))];
+      const fbAllUserIds = [...new Set([...fbClientIds, ...fbFreelancerIds])];
+      
+      let fbUsersMap = {};
+      if (fbAllUserIds.length > 0) {
+        const { data: fbUsersData } = await supabase
+          .from('users')
+          .select('id, user_name, email')
+          .in('id', fbAllUserIds);
+        
+        (fbUsersData || []).forEach(user => {
+          fbUsersMap[user.id] = { id: user.id, userName: user.user_name, email: user.email };
+        });
+      }
+      
+      list = fromNull.map((item) => {
+        const project = new Project(item);
+        if (item.client_id && fbUsersMap[item.client_id]) {
+          project.client = fbUsersMap[item.client_id];
+        }
+        if (item.freelancer_id && fbUsersMap[item.freelancer_id]) {
+          project.freelancer = fbUsersMap[item.freelancer_id];
+        }
+        return project;
+      });
     }
     return list;
   }

@@ -18,7 +18,12 @@ export const getProjects = asyncHandler(async (req, res) => {
   if (clientId) filters.clientId = clientId;
   if (freelancerId) filters.freelancerId = freelancerId;
 
+  console.log('[Projects] Fetching with filters:', filters);
   const projects = await Project.findAll(filters);
+  console.log('[Projects] Found:', projects.length, 'projects');
+  if (projects.length > 0) {
+    console.log('[Projects] Sample status values:', projects.slice(0, 3).map(p => p.status));
+  }
   
   return res.status(StatusCodes.OK).send(
     new ApiResponse(StatusCodes.OK, 'Projects fetched successfully', { projects: projects.map(p => p.toJSON()) })
