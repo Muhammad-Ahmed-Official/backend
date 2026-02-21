@@ -7,6 +7,7 @@ import {
   updateProject,
   deleteProject,
 } from '../controllers/project.controller.js';
+import { getMilestones, createMilestone } from '../controllers/milestone.controller.js';
 
 const projectRouter = Router();
 
@@ -137,6 +138,10 @@ projectRouter.route('/:id').put(verifyJwt, updateProject);
  *         description: Project deleted successfully
  */
 projectRouter.route('/:id').delete(verifyJwt, deleteProject);
+
+// Milestone sub-routes under projects
+projectRouter.route('/:projectId/milestones').get(verifyJwt, getMilestones);
+projectRouter.route('/:projectId/milestones').post(verifyJwt, createMilestone);
 
 export default projectRouter;
 

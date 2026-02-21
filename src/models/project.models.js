@@ -24,8 +24,9 @@ export class Project {
     this.category = data.category;
     this.duration = data.duration;
     this.status = data.status || 'ACTIVE';
+    this.progress = data.progress || 0;
     this.updatedAt = data.updated_at;
-    
+
     // Joined data
     this.client = data.client || null;
     this.freelancer = data.freelancer || null;
@@ -46,6 +47,7 @@ export class Project {
       category: this.category,
       duration: this.duration,
       status: this.status,
+      progress: this.progress,
       updatedAt: this.updatedAt,
       client: this.client,
       freelancer: this.freelancer,
@@ -184,6 +186,7 @@ export class Project {
     if (updateData.category) dbUpdateData.category = updateData.category;
     if (updateData.duration) dbUpdateData.duration = updateData.duration;
     if (updateData.status) dbUpdateData.status = updateData.status;
+    if (updateData.progress !== undefined) dbUpdateData.progress = updateData.progress;
     if (updateData.freelancerId !== undefined) dbUpdateData.freelancer_id = updateData.freelancerId;
 
     dbUpdateData.updated_at = new Date().toISOString();
