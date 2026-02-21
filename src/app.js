@@ -17,6 +17,7 @@ import serviceRouter from "./routes/service.route.js";
 import adminRouter from "./routes/admin.route.js";
 import adminDisputeRouter from "./routes/admin_dispute.route.js";
 import chatRouter from "./routes/chat.route.js";
+import milestoneRouter from "./routes/milestone.route.js";
 import { verifyJwt } from "./middleware/auth.middleware.js";
 import {
   getChatUserProfile,
@@ -84,7 +85,7 @@ app.use("/api/v1/disputes", disputeRouter);
 app.use("/api/v1/notifications", notificationRouter);
 app.use("/api/v1/reviews", reviewRouter);
 app.use("/api/v1/freelancers", freelancerRouter);
-app.use("/api/v1", milestoneRouter);
+app.use("/api/v1/milestones", milestoneRouter);
 app.get("/api/v1/chats/profile/:userId", verifyJwt, getChatUserProfile);
 app.delete("/api/v1/chats/:messageId", verifyJwt, deleteMessage);
 app.patch("/api/v1/chats/:messageId", verifyJwt, updateMessage);
