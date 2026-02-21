@@ -70,9 +70,17 @@ export class Notification {
   }
 
   static async create(notificationData) {
+    const insertData = {
+      user_id: notificationData.userId,
+      type: notificationData.type,
+      title: notificationData.title,
+      message: notificationData.message,
+      is_read: false,
+    };
+
     const { data, error } = await supabase
       .from('notifications')
-      .insert(notificationData)
+      .insert(insertData)
       .select()
       .single();
 

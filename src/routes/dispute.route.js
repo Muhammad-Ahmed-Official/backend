@@ -9,7 +9,6 @@ import {
   sendMessage,
   getEvidence,
   uploadEvidence,
-  getTimeline,
   escalateToSupport
 } from '../controllers/dispute.controller.js';
 
@@ -76,8 +75,6 @@ disputeRouter.route('/:id/messages').post(verifyJwt, sendMessage);
 
 disputeRouter.route('/:id/evidence').get(verifyJwt, getEvidence);
 disputeRouter.route('/:id/evidence').post(verifyJwt, uploadEvidence);
-
-disputeRouter.route('/:id/timeline').get(verifyJwt, getTimeline);
 
 disputeRouter.route('/:id/escalate').put(verifyJwt, escalateToSupport);
 

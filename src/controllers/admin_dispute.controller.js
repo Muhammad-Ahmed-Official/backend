@@ -1,5 +1,4 @@
 import { Dispute } from '../models/dispute.models.js';
-import { DisputeTimeline } from '../models/dispute_timeline.models.js';
 import { Notification } from '../models/notification.models.js';
 import { ApiResponse } from '../utils/ApiResponse.js';
 import { ApiError } from '../utils/ApiError.js';
@@ -42,14 +41,6 @@ export const assignMediator = asyncHandler(async (req, res) => {
 
     const dispute = await Dispute.assignMediator(id, mediatorId);
 
-    // Add timeline event
-    await DisputeTimeline.create({
-        disputeId: id,
-        type: 'mediator_assigned',
-        description: `Mediator assigned to dispute`,
-        performedBy: req.user.id
-    });
-
     return res.status(StatusCodes.OK).send(
         new ApiResponse(StatusCodes.OK, 'Mediator assigned successfully', {
             dispute: dispute.toJSON()
@@ -86,14 +77,6 @@ export const resolveDispute = asyncHandler(async (req, res) => {
         terms,
         decision,
         resolvedBy: adminId
-    });
-
-    // Add timeline event
-    await DisputeTimeline.create({
-        disputeId: id,
-        type: decision === 'resolve' ? 'dispute_resolved' : 'dispute_denied',
-        description: `Dispute ${decision === 'resolve' ? 'resolved' : 'denied'} by admin: ${description}`,
-        performedBy: adminId
     });
 
     // Notify parties

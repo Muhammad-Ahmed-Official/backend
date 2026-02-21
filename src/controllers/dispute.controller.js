@@ -2,7 +2,6 @@ import { Dispute } from '../models/dispute.models.js';
 import { Project } from '../models/project.models.js';
 import { DisputeMessage } from '../models/dispute_message.models.js';
 import { DisputeEvidence } from '../models/dispute_evidence.models.js';
-import { DisputeTimeline } from '../models/dispute_timeline.models.js';
 import { Notification } from '../models/notification.models.js';
 import { ApiResponse } from '../utils/ApiResponse.js';
 import { ApiError } from '../utils/ApiError.js';
@@ -72,14 +71,6 @@ export const createDispute = asyncHandler(async (req, res) => {
   };
 
   const dispute = await Dispute.create(disputeData);
-
-  // Add timeline event
-  await DisputeTimeline.create({
-    disputeId: dispute.id,
-    type: 'dispute_created',
-    description: `Dispute created by ${req.user.user_name}`,
-    performedBy: userId
-  });
 
   // Notify parties
   const otherPartyId = project.clientId === userId ? project.freelancerId : project.clientId;
@@ -160,44 +151,18 @@ export const uploadEvidence = asyncHandler(async (req, res) => {
     uploadedBy: userId
   });
 
-  // Add timeline event
-  await DisputeTimeline.create({
-    disputeId: id,
-    type: 'evidence_uploaded',
-    description: `${req.user.user_name} uploaded evidence: ${fileName}`,
-    performedBy: userId
-  });
-
   return res.status(StatusCodes.CREATED).send(
     new ApiResponse(StatusCodes.CREATED, 'Evidence uploaded successfully', { evidence: evidence.toJSON() })
   );
 });
 
-export const getTimeline = asyncHandler(async (req, res) => {
-  const { id } = req.params;
-  const timeline = await DisputeTimeline.findByDisputeId(id);
-
-  return res.status(StatusCodes.OK).send(
-    new ApiResponse(StatusCodes.OK, 'Timeline fetched successfully', { timeline: timeline.map(t => t.toJSON()) })
-  );
-});
-
 export const escalateToSupport = asyncHandler(async (req, res) => {
   const { id } = req.params;
-  const userId = req.user.id;
 
   const dispute = await Dispute.findById(id);
   if (!dispute) throw new ApiError(StatusCodes.NOT_FOUND, 'Dispute not found');
 
   const updatedDispute = await Dispute.updateStatus(id, 'Under Review');
-
-  // Add timeline event
-  await DisputeTimeline.create({
-    disputeId: id,
-    type: 'escalated',
-    description: `Dispute escalated to support by ${req.user.user_name}`,
-    performedBy: userId
-  });
 
   return res.status(StatusCodes.OK).send(
     new ApiResponse(StatusCodes.OK, 'Dispute escalated successfully', { dispute: updatedDispute.toJSON() })
