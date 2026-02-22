@@ -76,6 +76,7 @@ export class Notification {
       title: notificationData.title,
       message: notificationData.message,
       is_read: false,
+      ...(notificationData.relatedId && { related_id: notificationData.relatedId }),
     };
 
     const { data, error } = await supabase

@@ -2,6 +2,7 @@ import { Dispute } from '../models/dispute.models.js';
 import { Project } from '../models/project.models.js';
 import { DisputeMessage } from '../models/dispute_message.models.js';
 import { DisputeEvidence } from '../models/dispute_evidence.models.js';
+import { DisputeTimeline } from '../models/dispute_timeline.models.js';
 import { Notification } from '../models/notification.models.js';
 import { ApiResponse } from '../utils/ApiResponse.js';
 import { ApiError } from '../utils/ApiError.js';
@@ -68,9 +69,18 @@ export const createDispute = asyncHandler(async (req, res) => {
     reason,
     description: description || null,
     amount: amount ? parseFloat(amount) : null,
+    status: 'open',
   };
 
   const dispute = await Dispute.create(disputeData);
+
+  // Record timeline event for creation
+  await DisputeTimeline.create({
+    disputeId: dispute.id,
+    type: 'created',
+    description: `Dispute opened: ${reason}`,
+    performedBy: userId,
+  });
 
   // Notify parties
   const otherPartyId = project.clientId === userId ? project.freelancerId : project.clientId;
@@ -105,6 +115,10 @@ export const sendMessage = asyncHandler(async (req, res) => {
 
   const dispute = await Dispute.findById(id);
   if (!dispute) throw new ApiError(StatusCodes.NOT_FOUND, 'Dispute not found');
+
+  if (dispute.clientId !== userId && dispute.freelancerId !== userId) {
+    throw new ApiError(StatusCodes.FORBIDDEN, 'You are not a party to this dispute');
+  }
 
   const message = await DisputeMessage.create({
     disputeId: id,
@@ -142,6 +156,17 @@ export const uploadEvidence = asyncHandler(async (req, res) => {
   const { fileName, fileType, fileUrl, description } = req.body;
   const userId = req.user.id;
 
+  const dispute = await Dispute.findById(id);
+  if (!dispute) throw new ApiError(StatusCodes.NOT_FOUND, 'Dispute not found');
+
+  if (dispute.clientId !== userId && dispute.freelancerId !== userId) {
+    throw new ApiError(StatusCodes.FORBIDDEN, 'You are not a party to this dispute');
+  }
+
+  if (!fileName || !fileUrl) {
+    throw new ApiError(StatusCodes.BAD_REQUEST, 'fileName and fileUrl are required');
+  }
+
   const evidence = await DisputeEvidence.create({
     disputeId: id,
     fileName,
@@ -158,11 +183,23 @@ export const uploadEvidence = asyncHandler(async (req, res) => {
 
 export const escalateToSupport = asyncHandler(async (req, res) => {
   const { id } = req.params;
+  const userId = req.user.id;
 
   const dispute = await Dispute.findById(id);
   if (!dispute) throw new ApiError(StatusCodes.NOT_FOUND, 'Dispute not found');
 
-  const updatedDispute = await Dispute.updateStatus(id, 'Under Review');
+  if (dispute.clientId !== userId && dispute.freelancerId !== userId) {
+    throw new ApiError(StatusCodes.FORBIDDEN, 'You are not a party to this dispute');
+  }
+
+  const updatedDispute = await Dispute.updateStatus(id, 'under_review');
+
+  await DisputeTimeline.create({
+    disputeId: id,
+    type: 'escalated',
+    description: 'Dispute escalated to support for review',
+    performedBy: userId,
+  });
 
   return res.status(StatusCodes.OK).send(
     new ApiResponse(StatusCodes.OK, 'Dispute escalated successfully', { dispute: updatedDispute.toJSON() })
@@ -172,16 +209,43 @@ export const escalateToSupport = asyncHandler(async (req, res) => {
 export const updateDisputeStatus = asyncHandler(async (req, res) => {
   const { id } = req.params;
   const { status } = req.body;
+  const userId = req.user.id;
 
-  if (!['Pending', 'Resolved', 'Denied'].includes(status)) {
-    throw new ApiError(StatusCodes.BAD_REQUEST, 'Invalid status');
+  const dispute = await Dispute.findById(id);
+  if (!dispute) throw new ApiError(StatusCodes.NOT_FOUND, 'Dispute not found');
+
+  if (dispute.clientId !== userId && dispute.freelancerId !== userId) {
+    throw new ApiError(StatusCodes.FORBIDDEN, 'You are not a party to this dispute');
   }
 
-  const dispute = await Dispute.updateStatus(id, status);
+  // Users can only withdraw (close) their own dispute
+  if (status !== 'closed') {
+    throw new ApiError(StatusCodes.BAD_REQUEST, 'Users may only withdraw (close) their own disputes');
+  }
+
+  const updatedDispute = await Dispute.updateStatus(id, status);
+
+  await DisputeTimeline.create({
+    disputeId: id,
+    type: 'closed',
+    description: 'Dispute withdrawn by party',
+    performedBy: userId,
+  });
 
   return res.status(StatusCodes.OK).send(
-    new ApiResponse(StatusCodes.OK, 'Dispute status updated successfully', {
-      dispute: dispute.toJSON()
+    new ApiResponse(StatusCodes.OK, 'Dispute withdrawn successfully', {
+      dispute: updatedDispute.toJSON()
+    })
+  );
+});
+
+export const getTimeline = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const timeline = await DisputeTimeline.findByDisputeId(id);
+
+  return res.status(StatusCodes.OK).send(
+    new ApiResponse(StatusCodes.OK, 'Timeline fetched successfully', {
+      timeline: timeline.map(t => t.toJSON())
     })
   );
 });

@@ -26,10 +26,8 @@ export const verifyJwt = asyncHandler(async (req, _, next) => {
 
 
 export const verifyAdmin = asyncHandler(async (req, res, next) => {
-    verifyJwt(req, res, next, () => {
-        if (!req.user?.role === "admin") {
-            throw new ApiError(StatusCodes.UNAUTHORIZED, ADMIN_ACCESS);
-        }
-        next();
-    })
-})
+    if (req.user?.role?.toLowerCase() !== 'admin') {
+        throw new ApiError(StatusCodes.FORBIDDEN, ADMIN_ACCESS);
+    }
+    next();
+});
