@@ -106,6 +106,10 @@ export class Project {
     if (filters.status) {
       query = query.ilike('status', filters.status);
     }
+    // available=true: only show projects with no freelancer assigned (open for bidding)
+    if (filters.available === true) {
+      query = query.is('freelancer_id', null);
+    }
     if (filters.clientId) {
       query = query.eq('client_id', filters.clientId);
     }

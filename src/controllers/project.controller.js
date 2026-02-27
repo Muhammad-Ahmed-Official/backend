@@ -9,14 +9,15 @@ const { NO_DATA_FOUND, UPDATE_SUCCESS_MESSAGES, UPDATE_UNSUCCESS_MESSAGES } = re
 
 // Get all projects
 export const getProjects = asyncHandler(async (req, res) => {
-  const { status, category, search, clientId, freelancerId } = req.query;
-  
+  const { status, category, search, clientId, freelancerId, available } = req.query;
+
   const filters = {};
   if (status) filters.status = status;
   if (category) filters.category = category;
   if (search) filters.search = search;
   if (clientId) filters.clientId = clientId;
   if (freelancerId) filters.freelancerId = freelancerId;
+  if (available === 'true') filters.available = true;
 
   console.log('[Projects] Fetching with filters:', filters);
   const projects = await Project.findAll(filters);
