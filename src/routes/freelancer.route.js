@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { getFreelancers } from '../controllers/freelancer.controller.js';
+import { getFreelancers, getFreelancerById } from '../controllers/freelancer.controller.js';
 
 const freelancerRouter = Router();
 
@@ -23,5 +23,25 @@ const freelancerRouter = Router();
  *         description: Freelancers fetched successfully
  */
 freelancerRouter.route('/').get(getFreelancers);
+
+/**
+ * @swagger
+ * /api/v1/freelancers/{id}:
+ *   get:
+ *     summary: Get freelancer by ID
+ *     tags: [Freelancers]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Freelancer fetched successfully
+ *       404:
+ *         description: Freelancer not found
+ */
+freelancerRouter.route('/:id').get(getFreelancerById);
 
 export default freelancerRouter;

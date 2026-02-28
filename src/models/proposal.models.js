@@ -122,15 +122,32 @@ export class Proposal {
   static async findByFreelancer(freelancerId) {
     const { data, error } = await supabase
       .from('proposals')
-      .select(`
-        *,
-        project:projects!proposals_project_id_fkey(*)
-      `)
+      .select('*')
       .eq('freelancer_id', freelancerId)
       .order('created_at', { ascending: false });
 
     if (error) throw error;
-    return (data || []).map(item => new Proposal(item));
+    if (!data || data.length === 0) return [];
+
+    // Fetch related projects manually (avoids FK name dependency)
+    const projectIds = [...new Set(data.map(p => p.project_id).filter(Boolean))];
+    let projectsMap = new Map();
+
+    if (projectIds.length > 0) {
+      const { data: projectsData } = await supabase
+        .from('projects')
+        .select('id, title, description, budget, status, client_id')
+        .in('id', projectIds);
+
+      if (projectsData) {
+        projectsMap = new Map(projectsData.map(p => [p.id, p]));
+      }
+    }
+
+    return data.map(item => new Proposal({
+      ...item,
+      project: projectsMap.get(item.project_id) || null,
+    }));
   }
 
   static async create(proposalData) {

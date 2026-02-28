@@ -9,8 +9,8 @@ import {
   sendMessage,
   getEvidence,
   uploadEvidence,
-  getTimeline,
-  escalateToSupport
+  escalateToSupport,
+  getTimeline
 } from '../controllers/dispute.controller.js';
 
 const disputeRouter = Router();
@@ -77,8 +77,7 @@ disputeRouter.route('/:id/messages').post(verifyJwt, sendMessage);
 disputeRouter.route('/:id/evidence').get(verifyJwt, getEvidence);
 disputeRouter.route('/:id/evidence').post(verifyJwt, uploadEvidence);
 
-disputeRouter.route('/:id/timeline').get(verifyJwt, getTimeline);
-
 disputeRouter.route('/:id/escalate').put(verifyJwt, escalateToSupport);
+disputeRouter.route('/:id/timeline').get(verifyJwt, getTimeline);
 
 export default disputeRouter;

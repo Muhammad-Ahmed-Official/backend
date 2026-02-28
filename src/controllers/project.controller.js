@@ -10,16 +10,22 @@ const { NO_DATA_FOUND, UPDATE_SUCCESS_MESSAGES, UPDATE_UNSUCCESS_MESSAGES } = re
 
 // Get all projects
 export const getProjects = asyncHandler(async (req, res) => {
-  const { status, category, search, clientId, freelancerId } = req.query;
-  
+  const { status, category, search, clientId, freelancerId, available } = req.query;
+
   const filters = {};
   if (status) filters.status = status;
   if (category) filters.category = category;
   if (search) filters.search = search;
   if (clientId) filters.clientId = clientId;
   if (freelancerId) filters.freelancerId = freelancerId;
+  if (available === 'true') filters.available = true;
 
+  console.log('[Projects] Fetching with filters:', filters);
   const projects = await Project.findAll(filters);
+  console.log('[Projects] Found:', projects.length, 'projects');
+  if (projects.length > 0) {
+    console.log('[Projects] Sample status values:', projects.slice(0, 3).map(p => p.status));
+  }
   
   return res.status(StatusCodes.OK).send(
     new ApiResponse(StatusCodes.OK, 'Projects fetched successfully', { projects: projects.map(p => p.toJSON()) })

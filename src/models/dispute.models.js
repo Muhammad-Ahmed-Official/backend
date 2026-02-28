@@ -15,7 +15,6 @@ export class Dispute {
     this.assignedMediatorId = data.assigned_mediator_id;
     this.resolutionType = data.resolution_type;
     this.resolutionDescription = data.resolution_description;
-    this.resolutionTerms = data.resolution_terms || [];
     this.resolvedBy = data.resolved_by;
     this.resolvedAt = data.resolved_at;
     this.createdAt = data.created_at;
@@ -41,7 +40,6 @@ export class Dispute {
       assignedMediatorId: this.assignedMediatorId,
       resolutionType: this.resolutionType,
       resolutionDescription: this.resolutionDescription,
-      resolutionTerms: this.resolutionTerms,
       resolvedBy: this.resolvedBy,
       resolvedAt: this.resolvedAt,
       createdAt: this.createdAt,
@@ -173,7 +171,6 @@ export class Dispute {
         status: resolutionData.decision === 'resolve' ? 'resolved' : 'closed',
         resolution_type: resolutionData.type,
         resolution_description: resolutionData.description,
-        resolution_terms: resolutionData.terms,
         resolved_by: resolutionData.resolvedBy,
         resolved_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
