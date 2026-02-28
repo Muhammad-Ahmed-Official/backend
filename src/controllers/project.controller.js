@@ -4,6 +4,7 @@ import { ApiResponse } from '../utils/ApiResponse.js';
 import { StatusCodes } from 'http-status-codes';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { responseMessages } from '../constant/responseMessages.js';
+import { supabase } from '../config/supabase.js';
 
 const { NO_DATA_FOUND, UPDATE_SUCCESS_MESSAGES, UPDATE_UNSUCCESS_MESSAGES } = responseMessages;
 
@@ -110,6 +111,58 @@ export const deleteProject = asyncHandler(async (req, res) => {
   
   return res.status(StatusCodes.OK).send(
     new ApiResponse(StatusCodes.OK, 'Project deleted successfully', {})
+  );
+});
+
+// Get current user's saved project IDs (for bookmark state)
+export const getSavedProjectIds = asyncHandler(async (req, res) => {
+  const userId = req.user.id;
+  const { data, error } = await supabase
+    .from('saved_projects')
+    .select('project_id')
+    .eq('user_id', userId);
+  if (error) {
+    throw new ApiError(StatusCodes.INTERNAL_SERVER_ERROR, error.message || 'Failed to fetch saved projects');
+  }
+  const projectIds = (data || []).map((row) => row.project_id);
+  return res.status(StatusCodes.OK).send(
+    new ApiResponse(StatusCodes.OK, 'Saved project IDs fetched', { projectIds })
+  );
+});
+
+// Save (bookmark) a project
+export const saveProject = asyncHandler(async (req, res) => {
+  const userId = req.user.id;
+  const { id: projectId } = req.params;
+  const project = await Project.findById(projectId);
+  if (!project) {
+    throw new ApiError(StatusCodes.NOT_FOUND, 'Project not found');
+  }
+  const { error } = await supabase
+    .from('saved_projects')
+    .upsert({ user_id: userId, project_id: projectId }, { onConflict: ['user_id', 'project_id'] });
+  if (error) {
+    throw new ApiError(StatusCodes.INTERNAL_SERVER_ERROR, error.message || 'Failed to save project');
+  }
+  return res.status(StatusCodes.OK).send(
+    new ApiResponse(StatusCodes.OK, 'Project saved', { saved: true })
+  );
+});
+
+// Unsave (remove bookmark) a project
+export const unsaveProject = asyncHandler(async (req, res) => {
+  const userId = req.user.id;
+  const { id: projectId } = req.params;
+  const { error } = await supabase
+    .from('saved_projects')
+    .delete()
+    .eq('user_id', userId)
+    .eq('project_id', projectId);
+  if (error) {
+    throw new ApiError(StatusCodes.INTERNAL_SERVER_ERROR, error.message || 'Failed to unsave project');
+  }
+  return res.status(StatusCodes.OK).send(
+    new ApiResponse(StatusCodes.OK, 'Project unsaved', { saved: false })
   );
 });
 
