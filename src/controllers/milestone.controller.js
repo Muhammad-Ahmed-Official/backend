@@ -20,7 +20,7 @@ export const getMilestones = asyncHandler(async (req, res) => {
   const project = await Project.findById(projectId);
   if (!project) throw new ApiError(StatusCodes.NOT_FOUND, 'Project not found');
 
-  if (project.clientId !== userId && project.freelancerId !== userId) {
+  if (req.user.role !== 'Freelancer' && project.clientId !== userId) {
     throw new ApiError(StatusCodes.FORBIDDEN, 'Access denied');
   }
 
