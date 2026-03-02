@@ -49,7 +49,7 @@ export const getProjectById = asyncHandler(async (req, res) => {
 // Create project (Client only)
 export const createProject = asyncHandler(async (req, res) => {
   const userId = req.user.id;
-  const { title, description, budget, location, tags, category, duration } = req.body;
+  const { title, description, budget, currency, location, tags, category, duration } = req.body;
 
   if (!title || !description || !budget) {
     throw new ApiError(StatusCodes.BAD_REQUEST, 'Title, description, and budget are required');
@@ -64,6 +64,7 @@ export const createProject = asyncHandler(async (req, res) => {
     title,
     description,
     budget: parseFloat(budget),
+    currency: currency || 'USD',
     location,
     tags: tags || [],
     category,

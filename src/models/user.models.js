@@ -58,6 +58,7 @@ export class User {
         education: this.profile.education,
         languages: this.profile.languages || [],
         hourlyRate: this.profile.hourly_rate,
+        currency: this.profile.currency || 'USD',
         portfolio: this.profile.portfolio,
       };
     }
@@ -269,7 +270,7 @@ export class User {
   static async findByIdAndUpdate(id, updateData, options = {}) {
     // Separate user fields from profile fields
     const profileFields = [
-      'title', 'bio', 'skills', 'hourlyRate', 'location', 'phone',
+      'title', 'bio', 'skills', 'hourlyRate', 'currency', 'location', 'phone',
       'languages', 'education', 'experience', 'certifications',
       'portfolio', 'profileImage', 'availability', 'about'
     ];
@@ -296,6 +297,8 @@ export class User {
           profileUpdateData.hourly_rate = updateData[key];
         } else if (key === 'profileImage') {
           profileUpdateData.profile_image = updateData[key];
+        } else if (key === 'currency') {
+          profileUpdateData.currency = updateData[key];
         } else {
           profileUpdateData[key] = updateData[key];
         }
