@@ -9,6 +9,10 @@ export class Milestone {
     this.dueDate = data.due_date || null;
     this.status = data.status || 'pending';
     this.orderIndex = data.order_index || 0;
+    this.amount = data.amount !== null && data.amount !== undefined ? parseFloat(data.amount) : null;
+    this.submittedAt = data.submitted_at || null;
+    this.reviewDeadline = data.review_deadline || null;
+    this.approvedAt = data.approved_at || null;
     this.createdAt = data.created_at;
     this.updatedAt = data.updated_at;
   }
@@ -22,6 +26,10 @@ export class Milestone {
       dueDate: this.dueDate,
       status: this.status,
       orderIndex: this.orderIndex,
+      amount: this.amount,
+      submittedAt: this.submittedAt,
+      reviewDeadline: this.reviewDeadline,
+      approvedAt: this.approvedAt,
       createdAt: this.createdAt,
       updatedAt: this.updatedAt,
     };
@@ -59,6 +67,7 @@ export class Milestone {
         due_date: milestoneData.dueDate || null,
         status: 'pending',
         order_index: milestoneData.orderIndex || 0,
+        amount: milestoneData.amount || null,
       })
       .select()
       .single();
@@ -67,10 +76,10 @@ export class Milestone {
     return new Milestone(data);
   }
 
-  static async updateStatus(id, status) {
+  static async updateStatus(id, status, extra = {}) {
     const { data, error } = await supabase
       .from('milestones')
-      .update({ status, updated_at: new Date().toISOString() })
+      .update({ status, updated_at: new Date().toISOString(), ...extra })
       .eq('id', id)
       .select()
       .single();
@@ -79,7 +88,25 @@ export class Milestone {
     return new Milestone(data);
   }
 
-  // Returns progress 0-100 based on approved milestones
+  // Call fund_milestone_atomic RPC — deducts client wallet, adds to escrow, sets status='funded'
+  static async fundAtomic(milestoneId) {
+    const { error } = await supabase.rpc('fund_milestone_atomic', {
+      p_milestone: milestoneId,
+    });
+    if (error) throw error;
+    return Milestone.findById(milestoneId);
+  }
+
+  // Call release_escrow_atomic RPC — releases escrow to freelancer, sets status='released'
+  static async releaseAtomic(milestoneId) {
+    const { error } = await supabase.rpc('release_escrow_atomic', {
+      p_milestone: milestoneId,
+    });
+    if (error) throw error;
+    return Milestone.findById(milestoneId);
+  }
+
+  // Returns progress 0-100 based on released milestones
   static async calculateProjectProgress(projectId) {
     const { data, error } = await supabase
       .from('milestones')
@@ -89,8 +116,8 @@ export class Milestone {
     if (error) throw error;
     if (!data || data.length === 0) return 0;
 
-    const approved = data.filter((m) => m.status === 'approved').length;
-    return Math.round((approved / data.length) * 100);
+    const done = data.filter((m) => m.status === 'released' || m.status === 'approved').length;
+    return Math.round((done / data.length) * 100);
   }
 
   static async delete(id) {

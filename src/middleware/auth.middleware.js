@@ -8,12 +8,17 @@ const { UNAUTHORIZED_REQUEST, INVALID_TOKEN, ADMIN_ACCESS} = responseMessages
 
 export const verifyJwt = asyncHandler(async (req, _, next) => {
     const token = req.cookies?.accessToken || req.header("Authorization")?.replace("Bearer ", "");
-    
+
     if (!token) {
         throw new ApiError(StatusCodes.UNAUTHORIZED, UNAUTHORIZED_REQUEST);
     }
 
-    const decodedToken = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
+    let decodedToken;
+    try {
+        decodedToken = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
+    } catch (err) {
+        throw new ApiError(StatusCodes.UNAUTHORIZED, INVALID_TOKEN);
+    }
 
     const user = await User.findById(decodedToken?._id || decodedToken?.id, 'id, user_name, email, role, is_verified, created_at, updated_at');
     if (!user) {

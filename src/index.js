@@ -2,6 +2,7 @@ import "./loadEnv.js";
 import { app } from "./app.js";
 import { SocketService } from "./services/socket.service.js";
 import { supabase } from "./config/supabase.js";
+import { startAutoRelease } from "./utils/autoRelease.js";
 
 const DEFAULT_PORT = parseInt(process.env.PORT) || 3000;
 const MAX_PORT_ATTEMPTS = 10; // Maximum ports to try (3000-3009)
@@ -69,6 +70,7 @@ async function startServer() {
       socketService.initListener();
       app.set('io', socketService.io);
       console.log('Socket.io chat listener attached');
+      startAutoRelease();
       break; // Successfully started, exit loop
     } catch (error) {
       if (error.code === 'EADDRINUSE') {
