@@ -2,6 +2,7 @@ import { Notification } from '../models/notification.models.js';
 import { ApiResponse } from '../utils/ApiResponse.js';
 import { StatusCodes } from 'http-status-codes';
 import { asyncHandler } from '../utils/asyncHandler.js';
+import { supabase } from '../config/supabase.js';
 
 export const getNotifications = asyncHandler(async (req, res) => {
   const userId = req.user.id;
@@ -36,8 +37,28 @@ export const markAsRead = asyncHandler(async (req, res) => {
 export const markAllAsRead = asyncHandler(async (req, res) => {
   const userId = req.user.id;
   await Notification.markAllAsRead(userId);
-  
+
   return res.status(StatusCodes.OK).send(
     new ApiResponse(StatusCodes.OK, 'All notifications marked as read')
+  );
+});
+
+export const savePushToken = asyncHandler(async (req, res) => {
+  const userId = req.user.id;
+  const { pushToken } = req.body;
+
+  if (!pushToken) {
+    return res.status(StatusCodes.BAD_REQUEST).send(
+      new ApiResponse(StatusCodes.BAD_REQUEST, 'pushToken is required')
+    );
+  }
+
+  await supabase
+    .from('users')
+    .update({ push_token: pushToken })
+    .eq('id', userId);
+
+  return res.status(StatusCodes.OK).send(
+    new ApiResponse(StatusCodes.OK, 'Push token saved')
   );
 });
