@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { verifyJwt } from '../middleware/auth.middleware.js';
-import { getWallet, getTransactions, addFunds } from '../controllers/wallet.controller.js';
+import { getWallet, getTransactions, addFunds, withdrawFunds } from '../controllers/wallet.controller.js';
 
 const walletRouter = Router();
 
@@ -45,5 +45,19 @@ walletRouter.route('/transactions').get(verifyJwt, getTransactions);
  *         description: Funds added successfully
  */
 walletRouter.route('/add-funds').post(verifyJwt, addFunds);
+
+/**
+ * @swagger
+ * /api/v1/wallet/withdraw:
+ *   post:
+ *     summary: Withdraw funds from wallet
+ *     tags: [Wallet]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Withdrawal successful
+ */
+walletRouter.route('/withdraw').post(verifyJwt, withdrawFunds);
 
 export default walletRouter;

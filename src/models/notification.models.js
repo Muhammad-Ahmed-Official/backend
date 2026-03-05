@@ -1,4 +1,5 @@
 import { supabase } from '../config/supabase.js';
+import { sendPushToUser } from '../services/fcm.service.js';
 
 export class Notification {
   constructor(data) {
@@ -86,7 +87,16 @@ export class Notification {
       .single();
 
     if (error) throw error;
-    return new Notification(data);
+    const notification = new Notification(data);
+
+    // Fire-and-forget push notification
+    sendPushToUser(notificationData.userId, {
+      title: notificationData.title,
+      body: notificationData.message,
+      data: { type: notificationData.type, relatedId: String(notificationData.relatedId || '') },
+    });
+
+    return notification;
   }
 
   static async findAll(limit = 100) {

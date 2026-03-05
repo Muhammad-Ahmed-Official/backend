@@ -1,4 +1,5 @@
 import { Wallet, Transaction } from '../models/wallet.models.js';
+import { Notification } from '../models/notification.models.js';
 import { ApiResponse } from '../utils/ApiResponse.js';
 import { ApiError } from '../utils/ApiError.js';
 import { StatusCodes } from 'http-status-codes';
@@ -46,10 +47,61 @@ export const addFunds = asyncHandler(async (req, res) => {
     status: 'completed',
   });
   
+  Notification.create({
+    userId,
+    type: 'wallet_deposit',
+    title: 'Funds Added',
+    message: `$${parseFloat(amount).toFixed(2)} has been added to your wallet.`,
+  }).catch(() => {});
+
   return res.status(StatusCodes.OK).send(
-    new ApiResponse(StatusCodes.OK, 'Funds added successfully', { 
+    new ApiResponse(StatusCodes.OK, 'Funds added successfully', {
       wallet: wallet.toJSON(),
       transaction: transaction.toJSON()
+    })
+  );
+});
+
+export const withdrawFunds = asyncHandler(async (req, res) => {
+  const userId = req.user.id;
+  const { amount } = req.body;
+
+  const parsed = parseFloat(amount);
+  if (!amount || isNaN(parsed) || parsed <= 0) {
+    throw new ApiError(StatusCodes.BAD_REQUEST, 'Invalid amount');
+  }
+
+  const wallet = await Wallet.findByUserId(userId);
+  if (!wallet) {
+    throw new ApiError(StatusCodes.NOT_FOUND, 'Wallet not found');
+  }
+
+  if (parsed > wallet.balance) {
+    throw new ApiError(StatusCodes.BAD_REQUEST, 'Insufficient available balance');
+  }
+
+  const updated = await Wallet.updateBalance(userId, -parsed, 'balance');
+
+  const transaction = await Transaction.create({
+    wallet_id: wallet.id,
+    user_id: userId,
+    type: 'withdrawal',
+    amount: parsed,
+    description: 'Wallet withdrawal',
+    status: 'completed',
+  });
+
+  Notification.create({
+    userId,
+    type: 'wallet_withdrawal',
+    title: 'Withdrawal Successful',
+    message: `$${parsed.toFixed(2)} has been withdrawn from your wallet.`,
+  }).catch(() => {});
+
+  return res.status(StatusCodes.OK).send(
+    new ApiResponse(StatusCodes.OK, 'Withdrawal successful', {
+      wallet: updated.toJSON(),
+      transaction: transaction.toJSON(),
     })
   );
 });

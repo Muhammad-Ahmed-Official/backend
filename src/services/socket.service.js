@@ -158,6 +158,54 @@ export class SocketService {
         io.to(receiver).emit('stopTyping', sender);
       });
 
+      // WebRTC call signaling (no paid APIs; relay only)
+      socket.on('call:invite', (data) => {
+        const { toUserId, type, fromUserName } = data || {};
+        if (!toUserId || !userId) return;
+        const to = String(toUserId).trim().toLowerCase();
+        io.to(to).emit('call:incoming', {
+          fromUserId: userId,
+          type: type || 'video',
+          fromUserName: fromUserName || null,
+        });
+      });
+
+      socket.on('call:accept', (data) => {
+        const { toUserId } = data || {};
+        if (!toUserId) return;
+        io.to(String(toUserId).trim().toLowerCase()).emit('call:accepted', { fromUserId: userId });
+      });
+
+      socket.on('call:reject', (data) => {
+        const { toUserId } = data || {};
+        if (!toUserId) return;
+        io.to(String(toUserId).trim().toLowerCase()).emit('call:rejected', { fromUserId: userId });
+      });
+
+      socket.on('call:offer', (data) => {
+        const { toUserId, sdp } = data || {};
+        if (!toUserId || sdp == null) return;
+        io.to(String(toUserId).trim().toLowerCase()).emit('call:offer', { fromUserId: userId, sdp });
+      });
+
+      socket.on('call:answer', (data) => {
+        const { toUserId, sdp } = data || {};
+        if (!toUserId || sdp == null) return;
+        io.to(String(toUserId).trim().toLowerCase()).emit('call:answer', { fromUserId: userId, sdp });
+      });
+
+      socket.on('call:ice', (data) => {
+        const { toUserId, candidate } = data || {};
+        if (!toUserId) return;
+        io.to(String(toUserId).trim().toLowerCase()).emit('call:ice', { fromUserId: userId, candidate });
+      });
+
+      socket.on('call:hangup', (data) => {
+        const { toUserId } = data || {};
+        if (!toUserId) return;
+        io.to(String(toUserId).trim().toLowerCase()).emit('call:hangup', { fromUserId: userId });
+      });
+
       socket.on('connect_error', (err) => {
         console.log('Socket connection error', err?.message);
       });

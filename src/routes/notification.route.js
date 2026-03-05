@@ -4,7 +4,8 @@ import {
   getNotifications,
   getUnreadCount,
   markAsRead,
-  markAllAsRead
+  markAllAsRead,
+  savePushToken,
 } from '../controllers/notification.controller.js';
 import {
   sendSystemNotification,
@@ -71,6 +72,7 @@ notificationRouter.route('/:id/read').put(verifyJwt, markAsRead);
  *         description: All notifications marked as read
  */
 notificationRouter.route('/read-all').put(verifyJwt, markAllAsRead);
+notificationRouter.route('/push-token').put(verifyJwt, savePushToken);
 
 // Admin Operations (Patch/Delete)
 notificationRouter.route('/:id')

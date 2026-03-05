@@ -1,5 +1,6 @@
 import { Dispute } from '../models/dispute.models.js';
 import { Project } from '../models/project.models.js';
+import { Milestone } from '../models/milestone.models.js';
 import { DisputeMessage } from '../models/dispute_message.models.js';
 import { DisputeEvidence } from '../models/dispute_evidence.models.js';
 import { DisputeTimeline } from '../models/dispute_timeline.models.js';
@@ -45,7 +46,7 @@ export const getDisputeById = asyncHandler(async (req, res) => {
 
 export const createDispute = asyncHandler(async (req, res) => {
   const userId = req.user.id;
-  const { projectId, reason, description, amount } = req.body;
+  const { projectId, reason, description, amount, milestoneId } = req.body;
 
   if (!projectId || !reason) {
     throw new ApiError(StatusCodes.BAD_REQUEST, 'Project ID and reason are required');
@@ -62,6 +63,14 @@ export const createDispute = asyncHandler(async (req, res) => {
     throw new ApiError(StatusCodes.FORBIDDEN, 'You can only create disputes for your own projects');
   }
 
+  // If milestoneId provided, verify it belongs to this project
+  if (milestoneId) {
+    const milestone = await Milestone.findById(milestoneId);
+    if (!milestone || milestone.projectId !== projectId) {
+      throw new ApiError(StatusCodes.BAD_REQUEST, 'Milestone does not belong to this project');
+    }
+  }
+
   const disputeData = {
     project_id: projectId,
     client_id: project.clientId,
@@ -70,9 +79,15 @@ export const createDispute = asyncHandler(async (req, res) => {
     description: description || null,
     amount: amount ? parseFloat(amount) : null,
     status: 'open',
+    milestone_id: milestoneId || null,
   };
 
   const dispute = await Dispute.create(disputeData);
+
+  // Freeze the milestone — stops auto-release and signals funds are locked
+  if (milestoneId) {
+    await Milestone.updateStatus(milestoneId, 'disputed');
+  }
 
   // Record timeline event for creation
   await DisputeTimeline.create({

@@ -17,6 +17,7 @@ export class Project {
     this.clientId = data.client_id;
     this.freelancerId = data.freelancer_id;
     this.budget = parseFloat(data.budget) || 0;
+    this.currency = data.currency || 'USD';
     this.createdAt = data.created_at;
     this.location = data.location;
     this.bidsCount = data.bids_count || 0;
@@ -40,6 +41,7 @@ export class Project {
       clientId: this.clientId,
       freelancerId: this.freelancerId,
       budget: this.budget,
+      currency: this.currency,
       createdAt: this.createdAt,
       location: this.location,
       bidsCount: this.bidsCount,
@@ -105,6 +107,10 @@ export class Project {
     // Apply filters (case-insensitive status match)
     if (filters.status) {
       query = query.ilike('status', filters.status);
+    }
+    // available=true: only show projects with no freelancer assigned (open for bidding)
+    if (filters.available === true) {
+      query = query.is('freelancer_id', null);
     }
     if (filters.clientId) {
       query = query.eq('client_id', filters.clientId);
@@ -217,6 +223,7 @@ export class Project {
         description: projectData.description,
         client_id: projectData.clientId,
         budget: projectData.budget,
+        currency: projectData.currency || 'USD',
         location: projectData.location,
         tags: projectData.tags || [],
         category: projectData.category,
@@ -236,6 +243,7 @@ export class Project {
     if (updateData.title) dbUpdateData.title = updateData.title;
     if (updateData.description) dbUpdateData.description = updateData.description;
     if (updateData.budget !== undefined) dbUpdateData.budget = updateData.budget;
+    if (updateData.currency !== undefined) dbUpdateData.currency = updateData.currency;
     if (updateData.location !== undefined) dbUpdateData.location = updateData.location;
     if (updateData.tags) dbUpdateData.tags = updateData.tags;
     if (updateData.category) dbUpdateData.category = updateData.category;

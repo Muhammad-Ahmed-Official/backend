@@ -6,6 +6,9 @@ import {
   createProject,
   updateProject,
   deleteProject,
+  getSavedProjectIds,
+  saveProject,
+  unsaveProject,
 } from '../controllers/project.controller.js';
 import { getMilestones, createMilestone } from '../controllers/milestone.controller.js';
 
@@ -36,6 +39,11 @@ const projectRouter = Router();
  *         description: Projects fetched successfully
  */
 projectRouter.route('/').get(getProjects);
+
+// Saved projects (must be before /:id)
+projectRouter.get('/saved/ids', verifyJwt, getSavedProjectIds);
+projectRouter.post('/:id/save', verifyJwt, saveProject);
+projectRouter.delete('/:id/save', verifyJwt, unsaveProject);
 
 /**
  * @swagger

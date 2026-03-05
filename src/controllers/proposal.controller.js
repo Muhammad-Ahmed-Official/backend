@@ -151,13 +151,10 @@ export const updateProposalStatus = asyncHandler(async (req, res) => {
 
   // If accepted, assign freelancer to project and reject other proposals
   if (status === 'ACCEPTED') {
-    // Update project: assign freelancer and set status to indicate proposal accepted
-    // Status will be ACTIVE (since we only have ACTIVE, COMPLETED, CANCELLED)
-    // Project with freelancerId set means proposal accepted but work not started
-    await Project.findByIdAndUpdate(proposal.projectId, { 
+    // Update project: assign freelancer and transition status to IN_PROGRESS
+    await Project.findByIdAndUpdate(proposal.projectId, {
       freelancerId: proposal.freelancerId,
-      // Keep status as ACTIVE - project is active but now has assigned freelancer
-      // Frontend can differentiate: if freelancerId exists, it means proposal accepted
+      status: 'IN_PROGRESS',
     });
 
     // Reject all other proposals for this project

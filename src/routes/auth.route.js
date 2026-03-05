@@ -1,6 +1,6 @@
 import { Router } from "express";
 import multer from "multer";
-import { changeCurrentPassword, forgotPassword, googleSignin, logout, resendOtp, signin, signup, verifyEmail, getUserInfo, updateUser, refreshAccessToken, getCurrentUser, uploadProfileImage } from "../controllers/auth.controller.js";
+import { changeCurrentPassword, forgotPassword, googleSignin, logout, resendOtp, signin, signup, verifyEmail, getUserInfo, updateUser, refreshAccessToken, getCurrentUser, uploadProfileImage, checkUsername } from "../controllers/auth.controller.js";
 import { verifyJwt } from "../middleware/auth.middleware.js";
 
 const authRouter = Router();
@@ -41,6 +41,24 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 4 *
  *         description: User already exists
  */
 authRouter.route("/signup").post(signup);
+
+/**
+ * @swagger
+ * /api/v1/auth/check-username:
+ *   get:
+ *     summary: Check if username is available (public, for signup)
+ *     tags: [Authentication]
+ *     parameters:
+ *       - in: query
+ *         name: username
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: { available: true } or { available: false }
+ */
+authRouter.route("/check-username").get(checkUsername);
 
 /**
  * @swagger

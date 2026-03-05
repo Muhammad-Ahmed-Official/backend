@@ -25,6 +25,30 @@ const generateAccessAndRefreshToken = async (userId) => {
 }
 
 
+// @desc    Check if username is available (for signup real-time validation)
+// @route   GET /api/v1/auth/check-username?username=xxx
+// @access  Public
+export const checkUsername = asyncHandler(async (req, res) => {
+  const username = (req.query.username || '').toString().trim();
+  if (!username) {
+    return res.status(StatusCodes.OK).send(
+      new ApiResponse(StatusCodes.OK, 'Username required', { available: true })
+    );
+  }
+  if (username.length < 3) {
+    return res.status(StatusCodes.OK).send(
+      new ApiResponse(StatusCodes.OK, 'Too short', { available: true })
+    );
+  }
+  const normalized = username.toLowerCase();
+  const existing = await User.findOne({ userName: normalized });
+  return res.status(StatusCodes.OK).send(
+    new ApiResponse(StatusCodes.OK, existing ? 'Username taken' : 'Available', {
+      available: !existing,
+    })
+  );
+});
+
 // @desc    SIGNUP
 // @route   POST /api/v1/auth/signup
 // @access  Public
@@ -299,6 +323,7 @@ export const updateUser = asyncHandler(async (req, res) => {
         bio, 
         skills, 
         hourlyRate, 
+        currency,
         phone, 
         languages, 
         education, 
@@ -309,7 +334,7 @@ export const updateUser = asyncHandler(async (req, res) => {
     } = req.body;
     
     // At least one field should be provided
-    if (!userName && !bio && !skills && !hourlyRate && !phone && !languages && !education && !certifications && !portfolio && !profileImage && !about) {
+    if (!userName && !bio && !skills && !hourlyRate && !currency && !phone && !languages && !education && !certifications && !portfolio && !profileImage && !about) {
         throw new ApiError(StatusCodes.BAD_REQUEST, NO_DATA_FOUND);
     }
     
@@ -320,6 +345,7 @@ export const updateUser = asyncHandler(async (req, res) => {
     if (about) updateData.about = about;
     if (skills) updateData.skills = skills; // Array
     if (hourlyRate !== undefined) updateData.hourlyRate = hourlyRate;
+    if (currency) updateData.currency = currency;
     if (phone) updateData.phone = phone;
     if (languages) updateData.languages = languages; // Array
     if (education) updateData.education = education; // Text

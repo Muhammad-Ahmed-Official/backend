@@ -211,11 +211,12 @@ export const getChatUserProfile = async (req, res) => {
 
     const { data: profileRow } = await supabase
       .from('user_profiles')
-      .select('profile_image')
+      .select('profile_image, phone')
       .eq('user_id', userId)
       .maybeSingle();
 
     const profile_image = profileRow?.profile_image ?? null;
+    const phone = profileRow?.phone ?? null;
 
     return res.status(200).json({
       success: true,
@@ -225,6 +226,7 @@ export const getChatUserProfile = async (req, res) => {
         email: userRow.email,
         role: userRow.role || 'Freelancer',
         profile_image,
+        phone,
       },
     });
   } catch (error) {
