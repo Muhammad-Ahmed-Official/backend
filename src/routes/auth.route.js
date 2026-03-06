@@ -1,6 +1,6 @@
 import { Router } from "express";
 import multer from "multer";
-import { changeCurrentPassword, forgotPassword, googleSignin, logout, resendOtp, signin, signup, verifyEmail, getUserInfo, updateUser, refreshAccessToken, getCurrentUser, uploadProfileImage, checkUsername } from "../controllers/auth.controller.js";
+import { changeCurrentPassword, forgotPassword, googleSignin, logout, resendOtp, signin, signinWithRole, signup, verifyEmail, getUserInfo, updateUser, refreshAccessToken, getCurrentUser, uploadProfileImage, checkUsername } from "../controllers/auth.controller.js";
 import { verifyJwt } from "../middleware/auth.middleware.js";
 
 const authRouter = Router();
@@ -85,6 +85,9 @@ authRouter.route("/check-username").get(checkUsername);
  *         description: User not found
  */
 authRouter.route("/signin").post(signin);
+
+// Finalize signin with an explicit role (Client/Freelancer)
+authRouter.route("/signin-with-role").post(signinWithRole);
 
 /**
  * @swagger

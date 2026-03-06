@@ -72,18 +72,20 @@ export class User {
   }
 
   // Generate access token
-  generateAccessToken() {
+  generateAccessToken(activeRole) {
+    // activeRole allows per-session role (Client/Freelancer) without changing DB role
     return jwt.sign(
-      { _id: this.id, email: this.email },
+      { _id: this.id, email: this.email, role: activeRole || this.role },
       process.env.ACCESS_TOKEN_SECRET,
       { expiresIn: process.env.ACCESS_TOKEN_EXPIRY || '1d' }
     );
   }
 
   // Generate refresh token
-  generateRefreshToken() {
+  generateRefreshToken(activeRole) {
+    // Store role in refresh token so sessions keep the same active role on refresh
     return jwt.sign(
-      { _id: this.id },
+      { _id: this.id, role: activeRole || this.role },
       process.env.REFRESH_TOKEN_SECRET,
       { expiresIn: process.env.REFRESH_TOKEN_EXPIRY || '10d' }
     );
