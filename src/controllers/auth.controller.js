@@ -11,11 +11,12 @@ import { supabase } from '../config/supabase.js';
 
 const { MISSING_FIELDS, USER_EXISTS, UN_AUTHORIZED, SUCCESS_REGISTRATION, NO_USER, SUCCESS_LOGIN, INVALID_OTP, OTP_EXPIRED, EMAIL_VERIFY, SUCCESS_LOGOUT, MISSING_FIELD_EMAIL_PASSWORD, UNAUTHORIZED_REQUEST, GET_SUCCESS_MESSAGES, RESET_LINK_SUCCESS, PASSWORD_CHANGE, NOT_VERIFY, PASSWORD_AND_CONFIRM_NO_MATCH, UPDATE_UNSUCCESS_MESSAGES, MISSING_FIELD_EMAIL, RESET_OTP_SECCESS, INVALID_TOKEN, TOKEN_EXPIRED, SUCCESS_TOKEN, INVALID_DATA, NO_DATA_FOUND, IMAGE_SUCCESS, IMAGE_ERROR, UPDATE_SUCCESS_MESSAGES, UNAUTHORIZED, ERROR_MESSAGES } = responseMessages;
 
-const generateAccessAndRefreshToken = async (userId) => {
+const generateAccessAndRefreshToken = async (userId, activeRole) => {
     try {
         const user = await User.findById( userId );
-        const accessToken = user.generateAccessToken();
-        const refreshToken = user.generateRefreshToken();
+        const effectiveRole = activeRole || user.role;
+        const accessToken = user.generateAccessToken(effectiveRole);
+        const refreshToken = user.generateRefreshToken(effectiveRole);
         user.refreshToken = refreshToken;
         await user.save({validateBeforeSave: false});        
         return { accessToken, refreshToken };
@@ -85,7 +86,7 @@ export const signup = asyncHandler(async (req, res) => {
         throw new ApiError(StatusCodes.INTERNAL_SERVER_ERROR, ERROR_MESSAGES);
     }
 
-    const { accessToken, refreshToken } = await generateAccessAndRefreshToken(newUser.id);
+    const { accessToken, refreshToken } = await generateAccessAndRefreshToken(newUser.id, newUser.role);
     const options = {
         httpOnly: true, // Cookie can't be accessed via JavaScript
         secure: true, // Only set to true in production (use HTTPS)
@@ -230,25 +231,93 @@ export const signin = asyncHandler(async (req, res) => {
         throw new ApiError(StatusCodes.FORBIDDEN, NOT_VERIFY);
     }
       
-    const { accessToken, refreshToken } = await generateAccessAndRefreshToken(user.id);
-    
+    // For Admin, preserve existing direct-signin behaviour (no role picker)
+    if (user.role === 'Admin') {
+        const { accessToken, refreshToken } = await generateAccessAndRefreshToken(user.id, user.role);
+        const userData = await User.findById(user.id, 'id, user_name, email, role, is_verified, created_at, updated_at');
+        const loggedInusers = userData ? userData.toJSON() : null;
+        
+        const options = {
+            httpOnly: true,
+            secure: true,
+            sameSite: 'none',
+        };
+        return res
+        .status(StatusCodes.OK)
+        .cookie("accessToken", accessToken, options)
+        .cookie("refreshToken", refreshToken, options)
+        .send(new ApiResponse(StatusCodes.OK, 
+            SUCCESS_LOGIN,
+            {user: loggedInusers, accessToken, refreshToken },
+        ));
+    }
+
+    // For Client/Freelancer users, require explicit role selection at login.
+    // We don't generate tokens yet; frontend will call signin-with-role next.
+    const availableRoles = ['Client', 'Freelancer'];
+
+    return res.status(StatusCodes.OK).send(
+        new ApiResponse(StatusCodes.OK, SUCCESS_LOGIN, {
+            requiresRoleSelection: true,
+            roles: availableRoles,
+            email: user.email,
+            userId: user.id,
+        })
+    );
+});
+
+// @desc    SIGNIN WITH ROLE (finalize dual-role login)
+// @route   POST /api/v1/auth/signin-with-role
+// @access  Public
+export const signinWithRole = asyncHandler(async (req, res) => {
+    const { email, password, role } = req.body;
+
+    if (!email || !password || !role) {
+        throw new ApiError(StatusCodes.BAD_REQUEST, MISSING_FIELD_EMAIL_PASSWORD);
+    }
+
+    const allowedRoles = ['Client', 'Freelancer'];
+    if (!allowedRoles.includes(role)) {
+        throw new ApiError(StatusCodes.BAD_REQUEST, INVALID_DATA);
+    }
+
+    const user = await User.findOne({ email });
+    if (!user) {
+        throw new ApiError(StatusCodes.NOT_FOUND, NO_USER);
+    }
+
+    const isPaswordValid = await user.isPasswordCorrect(password);
+    if (!isPaswordValid) {
+        throw new ApiError(StatusCodes.UNAUTHORIZED, UN_AUTHORIZED);
+    }
+
+    if (user.isVerified !== true) {
+        throw new ApiError(StatusCodes.FORBIDDEN, NOT_VERIFY);
+    }
+
+    const { accessToken, refreshToken } = await generateAccessAndRefreshToken(user.id, role);
+
     const userData = await User.findById(user.id, 'id, user_name, email, role, is_verified, created_at, updated_at');
     const loggedInusers = userData ? userData.toJSON() : null;
-    
+
+    // Override role in response with the active role for this session
+    const activeUser = loggedInusers ? { ...loggedInusers, role } : { role };
+
     const options = {
-        httpOnly: true, // Cookie can't be accessed via JavaScript
-        secure: true, // Only set to true in production (use HTTPS)
-        sameSite: 'none', // Ensure it works with cross-site cookies
-    }
+        httpOnly: true,
+        secure: true,
+        sameSite: 'none',
+    };
+
     return res
-    .status(StatusCodes.OK)
-    .cookie("accessToken", accessToken, options)
-    .cookie("refreshToken", refreshToken, options)
-    .send(new ApiResponse(StatusCodes.OK, 
-        SUCCESS_LOGIN,
-        {user: loggedInusers, accessToken, refreshToken },
-    ))
-})
+        .status(StatusCodes.OK)
+        .cookie("accessToken", accessToken, options)
+        .cookie("refreshToken", refreshToken, options)
+        .send(new ApiResponse(StatusCodes.OK,
+            SUCCESS_LOGIN,
+            { user: activeUser, accessToken, refreshToken },
+        ));
+});
 
 
 export const googleSignin = asyncHandler(async (req, res) => {
@@ -270,7 +339,7 @@ export const googleSignin = asyncHandler(async (req, res) => {
         throw new ApiError(StatusCodes.NOT_FOUND, NO_USER);
     }
     
-    const { accessToken, refreshToken } = await generateAccessAndRefreshToken(user.id);
+    const { accessToken, refreshToken } = await generateAccessAndRefreshToken(user.id, user.role);
     
     const userData = await User.findById(user.id, 'id, user_name, email, role, is_verified, created_at, updated_at');
     const loggedInusers = userData ? userData.toJSON() : null;
@@ -340,7 +409,7 @@ export const updateUser = asyncHandler(async (req, res) => {
     
     // Prepare update data
     const updateData = {};
-    if (userName) updateData.userName = userName.toLowerCase();
+    if (userName) updateData.userName = userName.trim();
     if (bio) updateData.bio = bio;
     if (about) updateData.about = about;
     if (skills) updateData.skills = skills; // Array
@@ -515,7 +584,7 @@ export const refreshAccessToken =  asyncHandler(async (req, res) => {
             secure: true,
         }
     
-        const { accessToken, newRefreshToken }  = await generateAccessAndRefreshToken(user.id);
+        const { accessToken, refreshToken: newRefreshToken }  = await generateAccessAndRefreshToken(user.id, decodedToken.role || user.role);
         
         return res
         .status(StatusCodes.OK)

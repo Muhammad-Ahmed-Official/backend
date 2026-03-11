@@ -25,6 +25,14 @@ export const verifyJwt = asyncHandler(async (req, _, next) => {
         throw new ApiError(StatusCodes.UNAUTHORIZED, INVALID_TOKEN);
     }
 
+    // If JWT carries an explicit role (Client/Freelancer/Admin), treat it as the active role
+    if (decodedToken.role && typeof decodedToken.role === "string") {
+        const tokenRole = decodedToken.role;
+        if (["client", "freelancer", "admin"].includes(tokenRole.toLowerCase())) {
+            user.role = tokenRole;
+        }
+    }
+
     req.user = user;
     next();
 });
