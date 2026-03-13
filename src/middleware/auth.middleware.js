@@ -20,7 +20,7 @@ export const verifyJwt = asyncHandler(async (req, _, next) => {
         throw new ApiError(StatusCodes.UNAUTHORIZED, INVALID_TOKEN);
     }
 
-    const user = await User.findById(decodedToken?._id || decodedToken?.id, 'id, user_name, email, role, is_verified, created_at, updated_at');
+    const user = await User.findById(decodedToken?._id || decodedToken?.id, 'id, user_name, email, role, is_verified, two_factor_enabled, created_at, updated_at');
     if (!user) {
         throw new ApiError(StatusCodes.UNAUTHORIZED, INVALID_TOKEN);
     }

@@ -1,6 +1,6 @@
 import dotenv from 'dotenv';
 import nodemailer from "nodemailer";
-import { SEND_EMAIL_LINK, Verification_Email_Template } from "../constant/emailTemplate.js";
+import { SEND_EMAIL_LINK, Verification_Email_Template, TwoFA_Email_Template } from "../constant/emailTemplate.js";
 
 dotenv.config();
 
@@ -38,7 +38,6 @@ async function sendEmailOTP(mail, otp) {
 }
 
 
-
 async function sendEmailLink(mail, link) { 
     const emailConfig = getEmailConfig();
     const transporter = nodemailer.createTransport(emailConfig);
@@ -57,4 +56,22 @@ async function sendEmailLink(mail, link) {
     }
 }
 
-export { sendEmailOTP, sendEmailLink }
+async function sendEmail2FA(mail, otp) {
+    const emailConfig = getEmailConfig();
+    const transporter = nodemailer.createTransport(emailConfig);
+    const mailOptions = {
+        from: process.env.PORTAL_EMAIL,
+        to: mail,
+        subject: "Two-Factor Authentication Code",
+        html: TwoFA_Email_Template(otp),
+    };
+    try {
+        await transporter.sendMail(mailOptions);
+        return `2FA OTP sent to ${mail}`;
+    } catch (error) {
+        console.error('[sendEmail2FA] Error:', error);
+        throw `Error sending 2FA OTP to ${mail}: ${error}`;
+    }
+}
+
+export { sendEmailOTP, sendEmailLink, sendEmail2FA }

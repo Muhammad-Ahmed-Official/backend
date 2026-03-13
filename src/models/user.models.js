@@ -22,10 +22,12 @@ export class User {
     this.otp = data.otp;
     this.expiresIn = data.expires_in;
     this.isVerified = data.is_verified;
+    this.status = (data.status && ['active', 'suspended'].includes(data.status)) ? data.status : 'active';
     this.refreshToken = data.refresh_token;
     this.createdAt = data.created_at;
     this.updatedAt = data.updated_at;
-    
+    this.twoFactorEnabled = data.two_factor_enabled ?? false;
+
     // Profile data from joined user_profiles table
     this.profile = data.profile || null;
   }
@@ -38,8 +40,10 @@ export class User {
       email: this.email,
       role: this.role,
       isVerified: this.isVerified,
+      status: this.status,
       createdAt: this.createdAt,
       updatedAt: this.updatedAt,
+      twoFactorEnabled: this.twoFactorEnabled,
     };
 
     // Merge profile fields if profile exists
@@ -241,6 +245,9 @@ export class User {
     if (this.refreshToken !== undefined) {
       updateData.refresh_token = this.refreshToken || null;
     }
+    if (this.twoFactorEnabled !== undefined) {
+      updateData.two_factor_enabled = this.twoFactorEnabled;
+    }
 
     // Only update password if it's changed (not already hashed)
     if (this.password && !this.password.startsWith('$2')) {
@@ -284,8 +291,14 @@ export class User {
     for (const key of Object.keys(updateData)) {
       if (key === 'userName') {
         userUpdateData.user_name = updateData[key];
+      } else if (key === 'isVerified') {
+        userUpdateData.is_verified = updateData[key];
+      } else if (key === 'status' && ['active', 'suspended'].includes(updateData[key])) {
+        userUpdateData.status = updateData[key];
       } else if (key === 'refreshToken') {
         userUpdateData.refresh_token = updateData[key];
+      } else if (key === 'twoFactorEnabled') {
+        userUpdateData.two_factor_enabled = updateData[key];
       } else if (key === 'password') {
         // Hash password if not already hashed
         if (!updateData[key].startsWith('$2')) {

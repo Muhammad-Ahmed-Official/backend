@@ -4,7 +4,7 @@ import { ApiResponse } from "../utils/ApiResponse.js";
 import jwt from "jsonwebtoken";
 import { StatusCodes } from "http-status-codes";
 import { v4 as uuidv4 } from 'uuid';
-import { sendEmailLink, sendEmailOTP } from '../utils/sendEmail.js';
+import { sendEmailLink, sendEmailOTP, sendEmail2FA } from '../utils/sendEmail.js';
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { responseMessages } from "../constant/responseMessages.js";
 import { supabase } from '../config/supabase.js';
@@ -81,10 +81,10 @@ export const signup = asyncHandler(async (req, res) => {
         expiresIn: otpExpiry,
     });
 
-    const emailSent = await sendEmailOTP(email, otp);
-    if (!emailSent) {
-        throw new ApiError(StatusCodes.INTERNAL_SERVER_ERROR, ERROR_MESSAGES);
-    }
+    // const emailSent = await sendEmailOTP(email, otp);
+    // if (!emailSent) {
+    //     throw new ApiError(StatusCodes.INTERNAL_SERVER_ERROR, ERROR_MESSAGES);
+    // }
 
     const { accessToken, refreshToken } = await generateAccessAndRefreshToken(newUser.id, newUser.role);
     const options = {
@@ -252,8 +252,23 @@ export const signin = asyncHandler(async (req, res) => {
         ));
     }
 
-    // For Client/Freelancer users, require explicit role selection at login.
-    // We don't generate tokens yet; frontend will call signin-with-role next.
+    // For Client/Freelancer users: check 2FA first, then require role selection.
+    // If 2FA is enabled, send OTP and ask frontend to verify before showing role picker.
+    if (user.twoFactorEnabled) {
+        const otp = uuidv4().slice(0, 6);
+        user.otp = otp;
+        user.expiresIn = Date.now() + 600000; // 10 minutes
+        await user.save({ validateBeforeSave: false });
+        await sendEmail2FA(user.email, otp);
+
+        return res.status(StatusCodes.OK).send(
+            new ApiResponse(StatusCodes.OK, 'OTP sent to your email for Two-Factor Authentication.', {
+                requires2FA: true,
+                email: user.email,
+            })
+        );
+    }
+
     const availableRoles = ['Client', 'Freelancer'];
 
     return res.status(StatusCodes.OK).send(
@@ -266,11 +281,56 @@ export const signin = asyncHandler(async (req, res) => {
     );
 });
 
+// @desc    Verify 2FA OTP before role selection — issues a short-lived preAuthToken
+// @route   POST /api/v1/auth/2fa/pre-verify
+// @access  Public
+export const preVerify2FA = asyncHandler(async (req, res) => {
+    const { email, otp } = req.body;
+
+    if (!email || !otp) {
+        throw new ApiError(StatusCodes.BAD_REQUEST, MISSING_FIELDS);
+    }
+
+    const user = await User.findOne({ email });
+    if (!user) {
+        throw new ApiError(StatusCodes.NOT_FOUND, NO_USER);
+    }
+
+    if (user.otp !== otp) {
+        throw new ApiError(StatusCodes.FORBIDDEN, INVALID_OTP);
+    }
+
+    if (user.expiresIn && user.expiresIn < Date.now()) {
+        throw new ApiError(StatusCodes.FORBIDDEN, OTP_EXPIRED);
+    }
+
+    // Clear OTP
+    user.otp = null;
+    user.expiresIn = null;
+    await user.save({ validateBeforeSave: false });
+
+    // Issue a short-lived token confirming 2FA was passed (5 min)
+    const preAuthToken = jwt.sign(
+        { userId: user.id, type: '2fa_pre_verified' },
+        process.env.ACCESS_TOKEN_SECRET,
+        { expiresIn: '5m' }
+    );
+
+    return res.status(StatusCodes.OK).send(
+        new ApiResponse(StatusCodes.OK, 'OTP verified. Please select your role.', {
+            preAuthToken,
+            roles: ['Client', 'Freelancer'],
+            email: user.email,
+            userId: user.id,
+        })
+    );
+});
+
 // @desc    SIGNIN WITH ROLE (finalize dual-role login)
 // @route   POST /api/v1/auth/signin-with-role
 // @access  Public
 export const signinWithRole = asyncHandler(async (req, res) => {
-    const { email, password, role } = req.body;
+    const { email, password, role, preAuthToken } = req.body;
 
     if (!email || !password || !role) {
         throw new ApiError(StatusCodes.BAD_REQUEST, MISSING_FIELD_EMAIL_PASSWORD);
@@ -293,6 +353,21 @@ export const signinWithRole = asyncHandler(async (req, res) => {
 
     if (user.isVerified !== true) {
         throw new ApiError(StatusCodes.FORBIDDEN, NOT_VERIFY);
+    }
+
+    // If 2FA is enabled, require a valid preAuthToken (issued by /2fa/pre-verify)
+    if (user.twoFactorEnabled) {
+        if (!preAuthToken) {
+            throw new ApiError(StatusCodes.FORBIDDEN, '2FA verification is required. Please complete the OTP step first.');
+        }
+        try {
+            const decoded = jwt.verify(preAuthToken, process.env.ACCESS_TOKEN_SECRET);
+            if (decoded.type !== '2fa_pre_verified' || decoded.userId !== user.id) {
+                throw new Error('Invalid token');
+            }
+        } catch {
+            throw new ApiError(StatusCodes.FORBIDDEN, '2FA verification expired or invalid. Please login again.');
+        }
     }
 
     const { accessToken, refreshToken } = await generateAccessAndRefreshToken(user.id, role);
@@ -512,7 +587,7 @@ export const forgotPassword = asyncHandler(async (req, res) => {
     }
 
     // Generate reset token (use refreshToken as reset token)
-    const resetLink = `${process.env.ALLOWED_ORIGIN_1 || 'http://localhost:3000'}/api/v1/auth/change-password/${user.refreshToken}`;
+    const resetLink = `${process.env.ALLOWED_ORIGIN_1}/api/v1/auth/change-password/${user.refreshToken}`;
     sendEmailLink(email, resetLink)
         .then(() => console.log("Reset email sent successfully"))
         .catch((err) => console.error("Error sending reset email:", err));
@@ -603,3 +678,71 @@ export const refreshAccessToken =  asyncHandler(async (req, res) => {
 export const getCurrentUser = asyncHandler(async (req, res) => {
     return res.status(StatusCodes.OK).send(new ApiResponse(StatusCodes.OK, GET_SUCCESS_MESSAGES, req.user));
 })
+
+// NOTE: The Supabase `users` table requires a `two_factor_enabled BOOLEAN DEFAULT FALSE` column for 2FA to work.
+
+// @desc    Toggle 2FA on/off directly (no OTP required — just flips the flag)
+// @route   POST /api/v1/auth/2fa/toggle
+// @access  Private
+export const toggle2FA = asyncHandler(async (req, res) => {
+    const user = await User.findById(req.user.id);
+    if (!user) {
+        throw new ApiError(StatusCodes.NOT_FOUND, NO_USER);
+    }
+
+    const newValue = !user.twoFactorEnabled;
+    await User.findByIdAndUpdate(req.user.id, { twoFactorEnabled: newValue });
+
+    const updatedUser = await User.findById(req.user.id);
+
+    return res.status(StatusCodes.OK).send(
+        new ApiResponse(StatusCodes.OK, `Two-Factor Authentication ${newValue ? 'enabled' : 'disabled'} successfully.`, {
+            user: updatedUser.toJSON()
+        })
+    );
+});
+
+// @desc    Verify 2FA OTP during login and issue tokens
+// @route   POST /api/v1/auth/2fa/login-verify
+// @access  Public
+export const verifyLogin2FA = asyncHandler(async (req, res) => {
+    const { email, otp, role } = req.body;
+
+    if (!email || !otp || !role) {
+        throw new ApiError(StatusCodes.BAD_REQUEST, MISSING_FIELDS);
+    }
+
+    const user = await User.findOne({ email });
+    if (!user) {
+        throw new ApiError(StatusCodes.NOT_FOUND, NO_USER);
+    }
+
+    if (user.otp !== otp) {
+        throw new ApiError(StatusCodes.FORBIDDEN, INVALID_OTP);
+    }
+
+    if (user.expiresIn && user.expiresIn < Date.now()) {
+        throw new ApiError(StatusCodes.FORBIDDEN, OTP_EXPIRED);
+    }
+
+    // Clear OTP
+    user.otp = null;
+    user.expiresIn = null;
+    await user.save({ validateBeforeSave: false });
+
+    const { accessToken, refreshToken } = await generateAccessAndRefreshToken(user.id, role);
+    const userData = await User.findById(user.id);
+    const activeUser = userData ? { ...userData.toJSON(), role } : { role };
+
+    const options = {
+        httpOnly: true,
+        secure: true,
+        sameSite: 'none',
+    };
+
+    return res
+        .status(StatusCodes.OK)
+        .cookie("accessToken", accessToken, options)
+        .cookie("refreshToken", refreshToken, options)
+        .send(new ApiResponse(StatusCodes.OK, SUCCESS_LOGIN, { user: activeUser, accessToken, refreshToken }));
+});

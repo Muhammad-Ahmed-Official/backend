@@ -259,3 +259,36 @@ export const Welcome_Email_Template = `
   </body>
   </html>
 `;
+
+export const TwoFA_Email_Template = (otp) => `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Two-Factor Authentication</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 0; padding: 0; background-color: #f4f4f4; }
+    .container { max-width: 600px; margin: 30px auto; background: #ffffff; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); overflow: hidden; border: 1px solid #ddd; }
+    .header { background-color: #444751; color: white; padding: 20px; text-align: center; font-size: 22px; font-weight: bold; }
+    .content { padding: 25px; color: #333; line-height: 1.8; }
+    .otp-code { display: block; margin: 20px 0; font-size: 28px; color: #444751; background: #f4f4f8; border: 2px dashed #444751; padding: 14px; text-align: center; border-radius: 8px; font-weight: bold; letter-spacing: 6px; }
+    .footer { background-color: #f4f4f4; padding: 15px; text-align: center; color: #777; font-size: 12px; border-top: 1px solid #ddd; }
+    p { margin: 0 0 15px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">Two-Factor Authentication</div>
+    <div class="content">
+      <p>Hello,</p>
+      <p>You requested to change your Two-Factor Authentication setting. Use the code below to confirm this action:</p>
+      <span class="otp-code">${otp}</span>
+      <p>This code expires in <strong>10 minutes</strong>. If you did not request this, please ignore this email.</p>
+    </div>
+    <div class="footer">
+      <p>&copy; ${new Date().getFullYear()} Meraki. All rights reserved.</p>
+    </div>
+  </div>
+</body>
+</html>
+`;

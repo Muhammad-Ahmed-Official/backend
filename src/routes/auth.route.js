@@ -1,6 +1,6 @@
 import { Router } from "express";
 import multer from "multer";
-import { changeCurrentPassword, forgotPassword, googleSignin, logout, resendOtp, signin, signinWithRole, signup, verifyEmail, getUserInfo, updateUser, refreshAccessToken, getCurrentUser, uploadProfileImage, checkUsername } from "../controllers/auth.controller.js";
+import { changeCurrentPassword, forgotPassword, googleSignin, logout, resendOtp, signin, signinWithRole, signup, verifyEmail, getUserInfo, updateUser, refreshAccessToken, getCurrentUser, uploadProfileImage, checkUsername, toggle2FA, preVerify2FA } from "../controllers/auth.controller.js";
 import { verifyJwt } from "../middleware/auth.middleware.js";
 
 const authRouter = Router();
@@ -327,5 +327,8 @@ authRouter.route("/upload-profile-image").post(verifyJwt, upload.single("image")
  *         description: Unauthorized
  */
 authRouter.route("/refresh-token").post(refreshAccessToken);
+
+authRouter.route("/2fa/toggle").post(verifyJwt, toggle2FA);
+authRouter.route("/2fa/pre-verify").post(preVerify2FA);
 
 export default authRouter;
