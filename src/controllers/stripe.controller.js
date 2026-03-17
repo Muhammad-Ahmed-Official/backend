@@ -9,7 +9,7 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 // POST /api/v1/stripe/create-payment-intent
 // Creates a Stripe PaymentIntent for the given amount (in dollars).
 export const createPaymentIntent = asyncHandler(async (req, res) => {
-  const { amount, currency = 'usd' } = req.body;
+  const { amount, currency = 'usd', receiptEmail } = req.body;
 
   if (!amount || isNaN(parseFloat(amount)) || parseFloat(amount) <= 0) {
     throw new ApiError(StatusCodes.BAD_REQUEST, 'Valid amount is required');
@@ -19,6 +19,7 @@ export const createPaymentIntent = asyncHandler(async (req, res) => {
     amount: Math.round(parseFloat(amount) * 100), // dollars → cents
     currency: currency.toLowerCase(),
     automatic_payment_methods: { enabled: true },
+    ...(receiptEmail ? { receipt_email: receiptEmail } : {}),
   });
 
   return res.status(StatusCodes.OK).send(
