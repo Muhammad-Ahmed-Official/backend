@@ -5,6 +5,6 @@ export const asyncHandler = (requestHandler) => async(req, res, next) => {
         await requestHandler(req, res, next);
     } catch (error) {
         const statusCode = error.statusCode || StatusCodes.INTERNAL_SERVER_ERROR;
-        return res.status(statusCode).send({ status: false, message: error.message });
+        return res.status(statusCode).send({ status: false, message: error.message, ...(error.data && { data: error.data }) });
     }
 }

@@ -1,11 +1,39 @@
 import { Proposal } from '../models/proposal.models.js';
 import { Project } from '../models/project.models.js';
+import { Badge } from '../models/badge.models.js';
 import { ApiError } from '../utils/ApiError.js';
 import { ApiResponse } from '../utils/ApiResponse.js';
 import { StatusCodes } from 'http-status-codes';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { responseMessages } from '../constant/responseMessages.js';
+import { supabase } from '../config/supabase.js';
 import jwt from 'jsonwebtoken';
+
+// ── Proposal quiz attempt rules ────────────────────────────────────────────────
+const PASS_THRESHOLD_DEFAULT = 50;   // % required to submit (no badge)
+const PASS_THRESHOLD_BADGE   = 40;   // % required when freelancer has a matching badge
+const COOLDOWN_ATTEMPT_1_MS  = 30 * 60 * 1000;       // 30 minutes after 1st fail
+const COOLDOWN_ATTEMPT_2_MS  = 2 * 60 * 60 * 1000;   // 2 hours after 2nd fail
+
+async function getFailedAttempts(freelancerId, projectId) {
+  const { data } = await supabase
+    .from('proposal_quiz_attempts')
+    .select('*')
+    .eq('freelancer_id', freelancerId)
+    .eq('project_id', projectId)
+    .eq('passed', false)
+    .order('attempted_at', { ascending: true });
+  return data || [];
+}
+
+async function hasBadgeForProject(freelancerId, project) {
+  const tags = project.tags || [];
+  for (const tag of tags) {
+    const found = await Badge.hasActiveBadge(freelancerId, tag);
+    if (found) return true;
+  }
+  return false;
+}
 
 const { UPDATE_SUCCESS_MESSAGES } = responseMessages;
 
@@ -255,6 +283,47 @@ export const startProposalQuiz = asyncHandler(async (req, res) => {
   const existing = await Proposal.findByProjectAndFreelancer(projectId, freelancerId);
   if (existing) throw new ApiError(StatusCodes.CONFLICT, 'You have already applied to this project');
 
+  // ── Attempt gate ───────────────────────────────────────────────────────────
+  const failedAttempts = await getFailedAttempts(freelancerId, projectId);
+  const failCount = failedAttempts.length;
+
+  if (failCount >= 3) {
+    const unblockUsed = failedAttempts.some(a => a.badge_unblock_used);
+    if (unblockUsed) {
+      const err = new ApiError(StatusCodes.FORBIDDEN, 'You are permanently blocked from applying to this project. Badge unblock already used.');
+      err.data = { blocked: true, permanentlyBlocked: true, badgeUnblockAvailable: false };
+      throw err;
+    }
+    // Check if freelancer earned a badge after being blocked
+    const hasBadge = await hasBadgeForProject(freelancerId, project);
+    if (!hasBadge) {
+      const err = new ApiError(StatusCodes.FORBIDDEN, 'You are permanently blocked from applying to this project. Earn a verified skill badge to unlock one final attempt.');
+      err.data = { blocked: true, permanentlyBlocked: true, badgeUnblockAvailable: false };
+      throw err;
+    }
+    // Badge unblock: mark it and allow through
+    await supabase.from('proposal_quiz_attempts')
+      .update({ badge_unblock_used: true })
+      .eq('id', failedAttempts[0].id);
+  } else if (failCount === 2) {
+    const lastFail = failedAttempts[failCount - 1];
+    const retryAt = new Date(lastFail.attempted_at).getTime() + COOLDOWN_ATTEMPT_2_MS;
+    if (Date.now() < retryAt) {
+      const err = new ApiError(StatusCodes.TOO_MANY_REQUESTS, 'Quiz on cooldown — please wait before your 3rd attempt');
+      err.data = { blocked: true, permanentlyBlocked: false, attemptNumber: failCount, retryAfter: new Date(retryAt).toISOString() };
+      throw err;
+    }
+  } else if (failCount === 1) {
+    const lastFail = failedAttempts[0];
+    const retryAt = new Date(lastFail.attempted_at).getTime() + COOLDOWN_ATTEMPT_1_MS;
+    if (Date.now() < retryAt) {
+      const err = new ApiError(StatusCodes.TOO_MANY_REQUESTS, 'Quiz on cooldown — please wait before your 2nd attempt');
+      err.data = { blocked: true, permanentlyBlocked: false, attemptNumber: failCount, retryAfter: new Date(retryAt).toISOString() };
+      throw err;
+    }
+  }
+  // ──────────────────────────────────────────────────────────────────────────
+
   const rawQuestions = await generateJDQuiz(project.title, project.description);
 
   // Strip correct answers before sending to client
@@ -327,6 +396,46 @@ export const createProposalWithQuiz = asyncHandler(async (req, res) => {
   if (project.status !== 'ACTIVE') throw new ApiError(StatusCodes.BAD_REQUEST, 'Project is not active');
   if (project.clientId === freelancerId) throw new ApiError(StatusCodes.BAD_REQUEST, 'Cannot apply to your own project');
 
+  // ── Pass threshold ─────────────────────────────────────────────────────────
+  const badgeBonus = await hasBadgeForProject(freelancerId, project);
+  const threshold = badgeBonus ? PASS_THRESHOLD_BADGE : PASS_THRESHOLD_DEFAULT;
+
+  if (quizScore < threshold) {
+    // Record failed attempt
+    await supabase.from('proposal_quiz_attempts').insert({
+      freelancer_id: freelancerId,
+      project_id: projectId,
+      score: quizScore,
+      passed: false,
+    });
+
+    const failedAttempts = await getFailedAttempts(freelancerId, projectId);
+    const failCount = failedAttempts.length;
+    const permanentlyBlocked = failCount >= 3;
+
+    let retryAfter = null;
+    if (!permanentlyBlocked) {
+      const cooldownMs = failCount === 1 ? COOLDOWN_ATTEMPT_1_MS : COOLDOWN_ATTEMPT_2_MS;
+      retryAfter = new Date(Date.now() + cooldownMs).toISOString();
+    }
+
+    const err = new ApiError(StatusCodes.UNPROCESSABLE_ENTITY, `Quiz score too low — you scored ${quizScore}%, need ${threshold}%`);
+    err.data = {
+      passed: false, score: quizScore, correct, total: correctAnswers.length,
+      threshold, attemptNumber: failCount, retryAfter, permanentlyBlocked,
+    };
+    throw err;
+  }
+  // ──────────────────────────────────────────────────────────────────────────
+
+  // Record passing attempt
+  await supabase.from('proposal_quiz_attempts').insert({
+    freelancer_id: freelancerId,
+    project_id: projectId,
+    score: quizScore,
+    passed: true,
+  });
+
   const proposal = await Proposal.create({
     projectId,
     freelancerId,
@@ -338,7 +447,7 @@ export const createProposalWithQuiz = asyncHandler(async (req, res) => {
   return res.status(StatusCodes.CREATED).send(
     new ApiResponse(StatusCodes.CREATED, 'Proposal submitted successfully', {
       proposal: proposal.toJSON(),
-      quizResult: { score: quizScore, correct, total: correctAnswers.length },
+      quizResult: { passed: true, score: quizScore, correct, total: correctAnswers.length },
     })
   );
 });
