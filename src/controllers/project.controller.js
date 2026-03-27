@@ -1,3 +1,4 @@
+import Stripe from 'stripe';
 import { Project } from '../models/project.models.js';
 import { ApiError } from '../utils/ApiError.js';
 import { ApiResponse } from '../utils/ApiResponse.js';
@@ -5,6 +6,8 @@ import { StatusCodes } from 'http-status-codes';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { responseMessages } from '../constant/responseMessages.js';
 import { supabase } from '../config/supabase.js';
+
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
 const { NO_DATA_FOUND, UPDATE_SUCCESS_MESSAGES, UPDATE_UNSUCCESS_MESSAGES } = responseMessages;
 
@@ -47,9 +50,10 @@ export const getProjectById = asyncHandler(async (req, res) => {
 });
 
 // Create project (Client only)
+// Requires a successful Stripe payment (paymentIntentId) before saving.
 export const createProject = asyncHandler(async (req, res) => {
   const userId = req.user.id;
-  const { title, description, budget, currency, location, tags, category, duration } = req.body;
+  const { title, description, budget, currency, location, tags, category, duration, paymentIntentId } = req.body;
 
   if (!title || !description || !budget) {
     throw new ApiError(StatusCodes.BAD_REQUEST, 'Title, description, and budget are required');
@@ -58,6 +62,20 @@ export const createProject = asyncHandler(async (req, res) => {
   // Verify user is a client
   if (req.user.role !== 'Client') {
     throw new ApiError(StatusCodes.FORBIDDEN, 'Only clients can create projects');
+  }
+
+  // Verify Stripe payment before creating the project
+  if (!paymentIntentId) {
+    throw new ApiError(StatusCodes.BAD_REQUEST, 'Payment is required to create a project');
+  }
+
+  const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+  if (paymentIntent.status !== 'succeeded') {
+    throw new ApiError(StatusCodes.BAD_REQUEST, `Payment not completed. Status: ${paymentIntent.status}`);
+  }
+  const expectedCents = Math.round(parseFloat(budget) * 100);
+  if (paymentIntent.amount !== expectedCents) {
+    throw new ApiError(StatusCodes.BAD_REQUEST, 'Payment amount does not match project budget');
   }
 
   const project = await Project.create({
@@ -70,6 +88,7 @@ export const createProject = asyncHandler(async (req, res) => {
     category,
     duration,
     clientId: userId,
+    paymentIntentId,
   });
 
   return res.status(StatusCodes.CREATED).send(
