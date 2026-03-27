@@ -462,26 +462,27 @@ export const updateUser = asyncHandler(async (req, res) => {
         throw new ApiError(StatusCodes.BAD_REQUEST, UPDATE_UNSUCCESS_MESSAGES);
     };
 
-    const { 
-        userName, 
-        bio, 
-        skills, 
-        hourlyRate, 
+    const {
+        userName,
+        bio,
+        skills,
+        hourlyRate,
         currency,
-        phone, 
-        languages, 
-        education, 
-        certifications, 
-        portfolio, 
-        profileImage, 
-        about
+        phone,
+        languages,
+        education,
+        certifications,
+        portfolio,
+        profileImage,
+        about,
+        linkedinUrl
     } = req.body;
-    
+
     // At least one field should be provided
-    if (!userName && !bio && !skills && !hourlyRate && !currency && !phone && !languages && !education && !certifications && !portfolio && !profileImage && !about) {
+    if (!userName && !bio && !skills && !hourlyRate && !currency && !phone && !languages && !education && !certifications && !portfolio && !profileImage && !about && !linkedinUrl) {
         throw new ApiError(StatusCodes.BAD_REQUEST, NO_DATA_FOUND);
     }
-    
+
     // Prepare update data
     const updateData = {};
     if (userName) updateData.userName = userName.trim();
@@ -496,6 +497,7 @@ export const updateUser = asyncHandler(async (req, res) => {
     if (certifications) updateData.certifications = certifications; // Text
     if (portfolio) updateData.portfolio = portfolio; // Text
     if (profileImage) updateData.profileImage = profileImage;
+    if (linkedinUrl !== undefined) updateData.linkedinUrl = linkedinUrl;
     
     const user = await User.findByIdAndUpdate(userId, updateData, { new: true });
     return res.status(StatusCodes.OK).send(new ApiResponse(StatusCodes.OK, UPDATE_SUCCESS_MESSAGES, { user: user.toJSON() }));

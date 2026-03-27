@@ -56,7 +56,7 @@ authRouter.route("/signup").post(signup);
  *           type: string
  *     responses:
  *       200:
- *         description: { available: true } or { available: false }
+ *         description: Returns available true or false
  */
 authRouter.route("/check-username").get(checkUsername);
 

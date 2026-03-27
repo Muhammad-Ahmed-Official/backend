@@ -8,6 +8,8 @@ import {
   createProposal,
   updateProposalStatus,
   deleteProposal,
+  startProposalQuiz,
+  createProposalWithQuiz,
 } from '../controllers/proposal.controller.js';
 
 const proposalRouter = Router();
@@ -94,6 +96,8 @@ proposalRouter.route('/client').get(verifyJwt, getClientProposals);
  *       403:
  *         description: Only freelancers can submit proposals
  */
+proposalRouter.post('/project/:projectId/quiz/start', verifyJwt, startProposalQuiz);
+proposalRouter.post('/project/:projectId/apply', verifyJwt, createProposalWithQuiz);
 proposalRouter.route('/project/:projectId').post(verifyJwt, createProposal);
 
 /**

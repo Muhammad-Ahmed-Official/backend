@@ -12,6 +12,7 @@ import notificationRouter from "./routes/notification.route.js";
 import reviewRouter from "./routes/review.route.js";
 import freelancerRouter from "./routes/freelancer.route.js";
 import serviceRouter from "./routes/service.route.js";
+import badgeRouter from "./routes/badge.route.js";
 
 
 import adminRouter from "./routes/admin.route.js";
@@ -85,6 +86,7 @@ app.use("/api/v1/disputes", disputeRouter);
 app.use("/api/v1/notifications", notificationRouter);
 app.use("/api/v1/reviews", reviewRouter);
 app.use("/api/v1/freelancers", freelancerRouter);
+app.use("/api/v1/badges", badgeRouter);
 app.use("/api/v1/milestones", milestoneRouter);
 app.get("/api/v1/chats/profile/:userId", verifyJwt, getChatUserProfile);
 app.delete("/api/v1/chats/:messageId", verifyJwt, deleteMessage);

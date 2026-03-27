@@ -64,6 +64,7 @@ export class User {
         hourlyRate: this.profile.hourly_rate,
         currency: this.profile.currency || 'USD',
         portfolio: this.profile.portfolio,
+        linkedinUrl: this.profile.linkedin_url || null,
       };
     }
 
@@ -281,7 +282,7 @@ export class User {
     const profileFields = [
       'title', 'bio', 'skills', 'hourlyRate', 'currency', 'location', 'phone',
       'languages', 'education', 'experience', 'certifications',
-      'portfolio', 'profileImage', 'availability', 'about'
+      'portfolio', 'profileImage', 'availability', 'about', 'linkedinUrl'
     ];
     
     const userUpdateData = {};
@@ -314,6 +315,8 @@ export class User {
           profileUpdateData.profile_image = updateData[key];
         } else if (key === 'currency') {
           profileUpdateData.currency = updateData[key];
+        } else if (key === 'linkedinUrl') {
+          profileUpdateData.linkedin_url = updateData[key];
         } else {
           profileUpdateData[key] = updateData[key];
         }

@@ -5,6 +5,7 @@ import { ApiResponse } from '../utils/ApiResponse.js';
 import { StatusCodes } from 'http-status-codes';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { responseMessages } from '../constant/responseMessages.js';
+import jwt from 'jsonwebtoken';
 
 const { UPDATE_SUCCESS_MESSAGES } = responseMessages;
 
@@ -168,6 +169,177 @@ export const updateProposalStatus = asyncHandler(async (req, res) => {
 
   return res.status(StatusCodes.OK).send(
     new ApiResponse(StatusCodes.OK, UPDATE_SUCCESS_MESSAGES, { proposal: updatedProposal.toJSON() })
+  );
+});
+
+// ── Helper: Generate JD quiz via Groq ────────────────────────
+async function generateJDQuiz(projectTitle, projectDescription) {
+  const apiKey = process.env.GROQ_API_KEY;
+  if (!apiKey) throw new Error('GROQ_API_KEY not set');
+
+  const prompt = `You are an expert interviewer. Generate exactly 10 multiple-choice questions to screen a freelancer applying for this job.
+
+Job Title: ${projectTitle}
+Job Description: ${projectDescription.slice(0, 1500)}
+
+Generate questions that test the actual skills, tools, and knowledge needed for this specific job. Make them practical and non-trivial.
+
+Respond with ONLY this JSON (no extra text):
+{
+  "questions": [
+    {
+      "id": 1,
+      "q": "Question text?",
+      "A": "Option A",
+      "B": "Option B",
+      "C": "Option C",
+      "D": "Option D",
+      "correct": "A"
+    }
+  ]
+}
+
+Rules:
+- Exactly 10 questions, ids 1-10
+- Each has exactly 4 options (A B C D) and a "correct" field with the letter
+- Questions must be directly relevant to the job — not generic filler
+- Distractors should look plausible to someone with shallow knowledge
+- No trivial questions like "what is a variable"`;
+
+  const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model: 'llama-3.3-70b-versatile',
+      messages: [{ role: 'user', content: prompt }],
+      temperature: 0.7,
+      response_format: { type: 'json_object' },
+      max_tokens: 4000,
+    }),
+  });
+
+  if (!response.ok) {
+    const err = await response.text();
+    throw new Error(`Groq API error: ${response.status} — ${err}`);
+  }
+
+  const groqData = await response.json();
+  const content = groqData.choices?.[0]?.message?.content;
+  if (!content) throw new Error('Empty Groq response');
+
+  const parsed = JSON.parse(content);
+  if (!Array.isArray(parsed.questions) || parsed.questions.length < 5) {
+    throw new Error('AI returned invalid quiz format');
+  }
+
+  return parsed.questions.slice(0, 10);
+}
+
+// Start proposal quiz (generates 10 MCQ from JD)
+export const startProposalQuiz = asyncHandler(async (req, res) => {
+  const { projectId } = req.params;
+  const freelancerId = req.user.id;
+
+  if (req.user.role !== 'Freelancer') {
+    throw new ApiError(StatusCodes.FORBIDDEN, 'Only freelancers can take this quiz');
+  }
+
+  const project = await Project.findById(projectId);
+  if (!project) throw new ApiError(StatusCodes.NOT_FOUND, 'Project not found');
+  if (project.status !== 'ACTIVE') throw new ApiError(StatusCodes.BAD_REQUEST, 'Project is not active');
+  if (project.clientId === freelancerId) throw new ApiError(StatusCodes.BAD_REQUEST, 'Cannot apply to your own project');
+
+  const existing = await Proposal.findByProjectAndFreelancer(projectId, freelancerId);
+  if (existing) throw new ApiError(StatusCodes.CONFLICT, 'You have already applied to this project');
+
+  const rawQuestions = await generateJDQuiz(project.title, project.description);
+
+  // Strip correct answers before sending to client
+  const correctAnswers = rawQuestions.map(q => (q.correct || '').toUpperCase().trim());
+  const clientQuestions = rawQuestions.map(({ correct, ...rest }) => rest);
+
+  // Session token carries correct answers (expires in 1 hour)
+  const sessionToken = jwt.sign(
+    {
+      projectId,
+      freelancerId,
+      correctAnswers,
+      total: clientQuestions.length,
+      startedAt: Date.now(),
+    },
+    process.env.ACCESS_TOKEN_SECRET,
+    { expiresIn: '1h' }
+  );
+
+  return res.status(StatusCodes.OK).send(
+    new ApiResponse(StatusCodes.OK, 'Quiz started', {
+      sessionToken,
+      questions: clientQuestions,
+      total: clientQuestions.length,
+      projectTitle: project.title,
+    })
+  );
+});
+
+// Submit quiz answers + create proposal in one step
+export const createProposalWithQuiz = asyncHandler(async (req, res) => {
+  const { projectId } = req.params;
+  const freelancerId = req.user.id;
+  const { coverLetter, bidAmount, sessionToken, answers } = req.body;
+
+  if (!coverLetter || !bidAmount || !sessionToken || !Array.isArray(answers)) {
+    throw new ApiError(StatusCodes.BAD_REQUEST, 'coverLetter, bidAmount, sessionToken, and answers[] are required');
+  }
+
+  if (req.user.role !== 'Freelancer') {
+    throw new ApiError(StatusCodes.FORBIDDEN, 'Only freelancers can submit proposals');
+  }
+
+  // Verify JWT session
+  let session;
+  try {
+    session = jwt.verify(sessionToken, process.env.ACCESS_TOKEN_SECRET);
+  } catch {
+    throw new ApiError(StatusCodes.BAD_REQUEST, 'Quiz session expired or invalid — please start the quiz again');
+  }
+
+  if (session.projectId !== projectId) throw new ApiError(StatusCodes.BAD_REQUEST, 'Quiz session does not match this project');
+  if (session.freelancerId !== freelancerId) throw new ApiError(StatusCodes.FORBIDDEN, 'Quiz session does not belong to you');
+
+  // Anti-cheat: minimum 15 seconds
+  const elapsed = (Date.now() - session.startedAt) / 1000;
+  if (elapsed < 15) throw new ApiError(StatusCodes.BAD_REQUEST, 'Quiz completed too quickly');
+
+  // Score
+  const correctAnswers = session.correctAnswers;
+  let correct = 0;
+  for (let i = 0; i < correctAnswers.length; i++) {
+    if ((answers[i] || '').toUpperCase().trim() === correctAnswers[i]) correct++;
+  }
+  const quizScore = Math.round((correct / correctAnswers.length) * 100);
+
+  // Project checks
+  const project = await Project.findById(projectId);
+  if (!project) throw new ApiError(StatusCodes.NOT_FOUND, 'Project not found');
+  if (project.status !== 'ACTIVE') throw new ApiError(StatusCodes.BAD_REQUEST, 'Project is not active');
+  if (project.clientId === freelancerId) throw new ApiError(StatusCodes.BAD_REQUEST, 'Cannot apply to your own project');
+
+  const proposal = await Proposal.create({
+    projectId,
+    freelancerId,
+    coverLetter,
+    bidAmount: parseFloat(bidAmount),
+    quizScore,
+  });
+
+  return res.status(StatusCodes.CREATED).send(
+    new ApiResponse(StatusCodes.CREATED, 'Proposal submitted successfully', {
+      proposal: proposal.toJSON(),
+      quizResult: { score: quizScore, correct, total: correctAnswers.length },
+    })
   );
 });
 

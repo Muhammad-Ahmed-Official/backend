@@ -10,9 +10,10 @@ export class Proposal {
     this.coverLetter = data.cover_letter;
     this.bidAmount = parseFloat(data.bid_amount) || 0;
     this.status = data.status || 'PENDING';
+    this.quizScore = data.quiz_score ?? null;
     this.createdAt = data.created_at;
     this.updatedAt = data.updated_at;
-    
+
     // Joined data
     this.project = data.project || null;
     this.freelancer = data.freelancer || null;
@@ -26,6 +27,7 @@ export class Proposal {
       coverLetter: this.coverLetter,
       bidAmount: this.bidAmount,
       status: this.status,
+      quizScore: this.quizScore,
       createdAt: this.createdAt,
       updatedAt: this.updatedAt,
       project: this.project,
@@ -150,6 +152,16 @@ export class Proposal {
     }));
   }
 
+  static async findByProjectAndFreelancer(projectId, freelancerId) {
+    const { data } = await supabase
+      .from('proposals')
+      .select('id')
+      .eq('project_id', projectId)
+      .eq('freelancer_id', freelancerId)
+      .maybeSingle();
+    return data || null;
+  }
+
   static async create(proposalData) {
     // Check if proposal already exists
     const { data: existing } = await supabase
@@ -171,6 +183,7 @@ export class Proposal {
         cover_letter: proposalData.coverLetter,
         bid_amount: proposalData.bidAmount,
         status: 'PENDING',
+        ...(proposalData.quizScore !== undefined && { quiz_score: proposalData.quizScore }),
       })
       .select()
       .single();
