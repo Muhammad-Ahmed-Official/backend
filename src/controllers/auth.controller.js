@@ -81,10 +81,10 @@ export const signup = asyncHandler(async (req, res) => {
         expiresIn: otpExpiry,
     });
 
-    // const emailSent = await sendEmailOTP(email, otp);
-    // if (!emailSent) {
-    //     throw new ApiError(StatusCodes.INTERNAL_SERVER_ERROR, ERROR_MESSAGES);
-    // }
+    const emailSent = await sendEmailOTP(email, otp);
+    if (!emailSent) {
+        throw new ApiError(StatusCodes.INTERNAL_SERVER_ERROR, ERROR_MESSAGES);
+    }
 
     const { accessToken, refreshToken } = await generateAccessAndRefreshToken(newUser.id, newUser.role);
     const options = {
