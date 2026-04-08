@@ -1,6 +1,8 @@
 import dotenv from 'dotenv';
 import nodemailer from "nodemailer";
-import { SEND_EMAIL_LINK, Verification_Email_Template, TwoFA_Email_Template } from "../constant/emailTemplate.js";
+import { SEND_EMAIL_LINK, Verification_Email_Template, TwoFA_Email_Template, MilestoneSubmittedAdminEmailTemplate } from "../constant/emailTemplate.js";
+
+const ADMIN_EMAIL = 'alberuni167@gmail.com';
 
 dotenv.config();
 
@@ -74,4 +76,24 @@ async function sendEmail2FA(mail, otp) {
     }
 }
 
-export { sendEmailOTP, sendEmailLink, sendEmail2FA }
+async function sendMilestoneSubmittedAdminEmail({ project, client, freelancer, milestone }) {
+    const emailConfig = getEmailConfig();
+    const transporter = nodemailer.createTransport(emailConfig);
+    const mailOptions = {
+        from: `"Meraki Platform" <${process.env.PORTAL_EMAIL}>`,
+        to: ADMIN_EMAIL,
+        subject: `[Action Required] Milestone Submitted — Pay Freelancer | ${project.title}`,
+        html: MilestoneSubmittedAdminEmailTemplate({ project, client, freelancer, milestone }),
+    };
+
+    try {
+        await transporter.sendMail(mailOptions);
+        console.log(`[sendMilestoneSubmittedAdminEmail] Sent to ${ADMIN_EMAIL} for milestone: ${milestone.title}`);
+        return `Milestone submitted email sent to admin`;
+    } catch (error) {
+        console.error('[sendMilestoneSubmittedAdminEmail] Error:', error);
+        throw `Error sending milestone submitted email: ${error}`;
+    }
+}
+
+export { sendEmailOTP, sendEmailLink, sendEmail2FA, sendMilestoneSubmittedAdminEmail }

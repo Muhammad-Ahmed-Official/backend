@@ -4,6 +4,7 @@ import {
   startMilestone,
   submitMilestone,
   fundMilestone,
+  fundMilestoneExternal,
   approveMilestone,
   requestChanges,
   getEscrow,
@@ -13,6 +14,7 @@ import {
 const milestoneRouter = Router();
 
 // Client actions
+milestoneRouter.patch('/:milestoneId/fund-external', verifyJwt, fundMilestoneExternal);
 milestoneRouter.patch('/:milestoneId/fund', verifyJwt, fundMilestone);
 milestoneRouter.patch('/:milestoneId/approve', verifyJwt, approveMilestone);
 milestoneRouter.patch('/:milestoneId/request-changes', verifyJwt, requestChanges);

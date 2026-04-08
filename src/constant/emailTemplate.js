@@ -260,6 +260,192 @@ export const Welcome_Email_Template = `
   </html>
 `;
 
+export const MilestoneApprovalEmailTemplate = ({ project, client, freelancer, milestone }) => `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Milestone Approved — Payment Release Required</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 0; padding: 0; background-color: #f4f4f4; }
+    .container { max-width: 640px; margin: 30px auto; background: #ffffff; border-radius: 10px; box-shadow: 0 4px 18px rgba(0,0,0,0.1); overflow: hidden; border: 1px solid #ddd; }
+    .header { background-color: #282A32; color: #ffffff; padding: 24px 28px; text-align: center; }
+    .header h1 { margin: 0; font-size: 22px; font-weight: 700; letter-spacing: 0.3px; }
+    .header p { margin: 8px 0 0; font-size: 14px; color: #A5B4FC; }
+    .alert-banner { background-color: #4F46E5; color: #ffffff; padding: 14px 28px; text-align: center; font-size: 15px; font-weight: 700; letter-spacing: 0.3px; }
+    .content { padding: 28px; color: #333; line-height: 1.7; }
+    .section { margin-bottom: 24px; }
+    .section-title { font-size: 13px; font-weight: 700; color: #64748B; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 10px; border-bottom: 1px solid #E2E8F0; padding-bottom: 6px; }
+    .detail-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #F1F5F9; }
+    .detail-label { color: #64748B; font-size: 13px; font-weight: 600; }
+    .detail-value { color: #1E293B; font-size: 13px; font-weight: 700; text-align: right; }
+    .milestone-box { background: #F0FDF4; border: 2px solid #86EFAC; border-radius: 10px; padding: 18px; margin-bottom: 24px; }
+    .milestone-box .ms-title { font-size: 17px; font-weight: 800; color: #15803D; margin-bottom: 8px; }
+    .milestone-box .ms-amount { font-size: 26px; font-weight: 900; color: #16A34A; margin-bottom: 4px; }
+    .milestone-box .ms-status { display: inline-block; background: #DCFCE7; color: #16A34A; font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 20px; text-transform: uppercase; letter-spacing: 0.5px; }
+    .action-box { background: #FFF7ED; border: 2px solid #FED7AA; border-radius: 10px; padding: 20px; margin-bottom: 24px; }
+    .action-box .action-title { font-size: 15px; font-weight: 800; color: #92400E; margin-bottom: 8px; }
+    .action-box .action-text { font-size: 14px; color: #78350F; line-height: 1.6; }
+    .footer { background-color: #F8FAFC; padding: 16px 28px; text-align: center; color: #94A3B8; font-size: 12px; border-top: 1px solid #E2E8F0; }
+    p { margin: 0 0 14px; }
+    table { width: 100%; border-collapse: collapse; }
+    td { padding: 6px 0; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>Meraki Freelance Platform</h1>
+      <p>Admin Payment Release Notification</p>
+    </div>
+
+    <div class="alert-banner">
+      ACTION REQUIRED: Please Release Payment to Freelancer
+    </div>
+
+    <div class="content">
+      <p>Hello Admin,</p>
+      <p>A milestone has been <strong>approved by the client</strong> on the Meraki platform. Please process the payment release to the freelancer at your earliest convenience.</p>
+
+      <div class="milestone-box">
+        <div class="ms-title">${milestone.title}</div>
+        <div class="ms-amount">$${Number(milestone.amount || 0).toFixed(2)} USD</div>
+        <span class="ms-status">Approved — Awaiting Payment</span>
+        ${milestone.description ? `<p style="margin-top:10px;font-size:13px;color:#374151;">${milestone.description}</p>` : ''}
+      </div>
+
+      <div class="section">
+        <div class="section-title">Project Details</div>
+        <table>
+          <tr><td class="detail-label">Project Title</td><td class="detail-value">${project.title}</td></tr>
+          <tr><td class="detail-label">Project ID</td><td class="detail-value" style="font-family:monospace;font-size:11px;">${project.id}</td></tr>
+          <tr><td class="detail-label">Project Budget</td><td class="detail-value">$${Number(project.budget || 0).toFixed(2)} USD</td></tr>
+          <tr><td class="detail-label">Project Status</td><td class="detail-value">${project.status}</td></tr>
+          ${project.description ? `<tr><td class="detail-label">Description</td><td class="detail-value" style="font-size:12px;max-width:240px;">${project.description.substring(0, 120)}${project.description.length > 120 ? '...' : ''}</td></tr>` : ''}
+        </table>
+      </div>
+
+      <div class="section">
+        <div class="section-title">Client Information</div>
+        <table>
+          <tr><td class="detail-label">Name</td><td class="detail-value">${client.userName || client.user_name || 'N/A'}</td></tr>
+          <tr><td class="detail-label">Email</td><td class="detail-value">${client.email || 'N/A'}</td></tr>
+          <tr><td class="detail-label">Client ID</td><td class="detail-value" style="font-family:monospace;font-size:11px;">${client.id}</td></tr>
+        </table>
+      </div>
+
+      <div class="section">
+        <div class="section-title">Freelancer Information (Payment Recipient)</div>
+        <table>
+          <tr><td class="detail-label">Name</td><td class="detail-value">${freelancer.userName || freelancer.user_name || 'N/A'}</td></tr>
+          <tr><td class="detail-label">Email</td><td class="detail-value">${freelancer.email || 'N/A'}</td></tr>
+          <tr><td class="detail-label">Freelancer ID</td><td class="detail-value" style="font-family:monospace;font-size:11px;">${freelancer.id}</td></tr>
+        </table>
+      </div>
+
+      <div class="section">
+        <div class="section-title">Milestone Details</div>
+        <table>
+          <tr><td class="detail-label">Milestone Name</td><td class="detail-value">${milestone.title}</td></tr>
+          <tr><td class="detail-label">Amount to Release</td><td class="detail-value" style="color:#16A34A;font-size:16px;">$${Number(milestone.amount || 0).toFixed(2)} USD</td></tr>
+          <tr><td class="detail-label">Status</td><td class="detail-value">Approved</td></tr>
+          <tr><td class="detail-label">Milestone ID</td><td class="detail-value" style="font-family:monospace;font-size:11px;">${milestone.id}</td></tr>
+          ${milestone.approvedAt ? `<tr><td class="detail-label">Approved At</td><td class="detail-value">${new Date(milestone.approvedAt).toLocaleString()}</td></tr>` : ''}
+        </table>
+      </div>
+
+      <div class="action-box">
+        <div class="action-title">Required Action</div>
+        <div class="action-text">
+          Please release <strong>$${Number(milestone.amount || 0).toFixed(2)} USD</strong> to the freelancer
+          <strong>${freelancer.userName || freelancer.user_name || freelancer.email}</strong>
+          (${freelancer.email}) for the approved work on project "<strong>${project.title}</strong>".
+        </div>
+      </div>
+
+      <p style="color:#64748B;font-size:13px;">This is an automated notification from the Meraki Freelance Platform. Please do not reply to this email.</p>
+    </div>
+
+    <div class="footer">
+      <p>&copy; ${new Date().getFullYear()} Meraki Freelance Platform. All rights reserved.</p>
+      <p>This email was sent because a milestone was approved on the platform.</p>
+    </div>
+  </div>
+</body>
+</html>
+`;
+
+/** Freelancer submitted work — notify admin to pay freelancer (client pays platform separately). */
+export const MilestoneSubmittedAdminEmailTemplate = ({ project, client, freelancer, milestone }) => `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Milestone Submitted — Payment to Freelancer</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 0; padding: 0; background-color: #f4f4f4; }
+    .container { max-width: 640px; margin: 30px auto; background: #ffffff; border-radius: 10px; box-shadow: 0 4px 18px rgba(0,0,0,0.1); overflow: hidden; border: 1px solid #ddd; }
+    .header { background-color: #1E3A5F; color: #ffffff; padding: 24px 28px; text-align: center; }
+    .alert-banner { background-color: #0D9488; color: #ffffff; padding: 14px 28px; text-align: center; font-size: 15px; font-weight: 700; }
+    .content { padding: 28px; color: #333; line-height: 1.7; }
+    .section-title { font-size: 13px; font-weight: 700; color: #64748B; text-transform: uppercase; margin-bottom: 10px; border-bottom: 1px solid #E2E8F0; padding-bottom: 6px; }
+    .milestone-box { background: #F0FDFA; border: 2px solid #5EEAD4; border-radius: 10px; padding: 18px; margin-bottom: 24px; }
+    .action-box { background: #FFF7ED; border: 2px solid #FED7AA; border-radius: 10px; padding: 20px; margin-top: 20px; }
+    table { width: 100%; border-collapse: collapse; }
+    td { padding: 6px 0; font-size: 13px; }
+    .detail-label { color: #64748B; font-weight: 600; }
+    .detail-value { color: #1E293B; font-weight: 700; text-align: right; }
+    .footer { background-color: #F8FAFC; padding: 16px 28px; text-align: center; color: #94A3B8; font-size: 12px; border-top: 1px solid #E2E8F0; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1 style="margin:0;font-size:22px;">Meraki Freelance Platform</h1>
+      <p style="margin:8px 0 0;font-size:14px;opacity:0.9;">Milestone work submitted</p>
+    </div>
+    <div class="alert-banner">Please release payment to the freelancer</div>
+    <div class="content">
+      <p>Hello Admin,</p>
+      <p>A freelancer has <strong>submitted milestone work</strong> for client review. The client has already paid the platform; please arrange payment to the freelancer as agreed.</p>
+      <div class="milestone-box">
+        <div style="font-size:17px;font-weight:800;color:#0F766E;margin-bottom:8px;">${milestone.title}</div>
+        <div style="font-size:24px;font-weight:900;color:#0D9488;">$${Number(milestone.amount || 0).toFixed(2)} USD</div>
+        <div style="font-size:12px;color:#64748B;margin-top:8px;">Status: Submitted — awaiting client accept/reject</div>
+        ${milestone.description ? `<p style="margin-top:10px;font-size:13px;">${String(milestone.description).substring(0, 200)}</p>` : ''}
+      </div>
+      <div class="section-title">Project</div>
+      <table>
+        <tr><td class="detail-label">Title</td><td class="detail-value">${project.title}</td></tr>
+        <tr><td class="detail-label">Project ID</td><td class="detail-value" style="font-family:monospace;font-size:11px;">${project.id}</td></tr>
+        <tr><td class="detail-label">Budget</td><td class="detail-value">$${Number(project.budget || 0).toFixed(2)} USD</td></tr>
+      </table>
+      <div class="section-title" style="margin-top:20px;">Client</div>
+      <table>
+        <tr><td class="detail-label">Name</td><td class="detail-value">${client.userName || client.user_name || 'N/A'}</td></tr>
+        <tr><td class="detail-label">Email</td><td class="detail-value">${client.email || 'N/A'}</td></tr>
+      </table>
+      <div class="section-title" style="margin-top:20px;">Freelancer (payee)</div>
+      <table>
+        <tr><td class="detail-label">Name</td><td class="detail-value">${freelancer.userName || freelancer.user_name || 'N/A'}</td></tr>
+        <tr><td class="detail-label">Email</td><td class="detail-value">${freelancer.email || 'N/A'}</td></tr>
+      </table>
+      <div class="action-box">
+        <strong style="color:#92400E;">Required action:</strong>
+        <p style="margin:8px 0 0;color:#78350F;">Please release <strong>$${Number(milestone.amount || 0).toFixed(2)} USD</strong> to <strong>${freelancer.userName || freelancer.user_name || freelancer.email}</strong> for this milestone.</p>
+      </div>
+      <p style="color:#64748B;font-size:12px;">Automated message — do not reply.</p>
+    </div>
+    <div class="footer">
+      <p>&copy; ${new Date().getFullYear()} Meraki Freelance Platform</p>
+    </div>
+  </div>
+</body>
+</html>
+`;
+
 export const TwoFA_Email_Template = (otp) => `
 <!DOCTYPE html>
 <html lang="en">

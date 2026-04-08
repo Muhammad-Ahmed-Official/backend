@@ -16,7 +16,7 @@ export const createPaymentIntent = asyncHandler(async (req, res) => {
   }
 
   const paymentIntent = await stripe.paymentIntents.create({
-    amount: Math.round(parseFloat(amount) * 100), // dollars → cents
+    amount: Math.round(parseFloat(amount)), // already in cents from frontend
     currency: currency.toLowerCase(),
     automatic_payment_methods: { enabled: true },
     ...(receiptEmail ? { receipt_email: receiptEmail } : {}),

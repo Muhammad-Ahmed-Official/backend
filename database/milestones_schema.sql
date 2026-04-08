@@ -14,6 +14,9 @@ CREATE TABLE IF NOT EXISTS milestones (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- Freelancer submission (optional GitHub link on submit)
+ALTER TABLE milestones ADD COLUMN IF NOT EXISTS submission_github_url TEXT;
+
 -- Index for fast project-based queries
 CREATE INDEX IF NOT EXISTS idx_milestones_project_id ON milestones(project_id);
 CREATE INDEX IF NOT EXISTS idx_milestones_status ON milestones(status);

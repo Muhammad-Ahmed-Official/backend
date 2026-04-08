@@ -49,4 +49,35 @@ export class EscrowTransaction {
     if (error || !data) return null;
     return new EscrowTransaction(data);
   }
+
+  /** Create HELD escrow without moving in-app wallet (e.g. client paid platform via PayPal). */
+  static async createHeld({ milestoneId, payerId, payeeId, amount }) {
+    const { data, error } = await supabase
+      .from('escrow_transactions')
+      .insert({
+        milestone_id: milestoneId,
+        payer_id: payerId,
+        payee_id: payeeId,
+        amount,
+        status: 'HELD',
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+    return new EscrowTransaction(data);
+  }
+
+  // Mark escrow as RELEASED without moving funds to freelancer wallet.
+  // Used when admin handles payment manually outside the platform wallet.
+  static async markAsReleased(milestoneId) {
+    const { error } = await supabase
+      .from('escrow_transactions')
+      .update({ status: 'RELEASED', released_at: new Date().toISOString() })
+      .eq('milestone_id', milestoneId)
+      .eq('status', 'HELD');
+
+    if (error) throw error;
+    return true;
+  }
 }
