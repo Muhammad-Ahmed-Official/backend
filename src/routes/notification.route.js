@@ -8,6 +8,7 @@ import {
   savePushToken,
 } from '../controllers/notification.controller.js';
 import {
+  getSystemNotifications,
   sendSystemNotification,
   updateSystemNotification,
   deleteSystemNotification
@@ -43,6 +44,7 @@ notificationRouter.route('/')
  *       200:
  *         description: Unread count fetched successfully
  */
+notificationRouter.route('/all').get(verifyJwt, getSystemNotifications); // Admin: all notifications
 notificationRouter.route('/unread-count').get(verifyJwt, getUnreadCount);
 
 /**
