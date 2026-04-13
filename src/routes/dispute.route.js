@@ -1,5 +1,11 @@
 import { Router } from 'express';
+import multer from 'multer';
 import { verifyJwt } from '../middleware/auth.middleware.js';
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB
+});
 import {
   getMyDisputes,
   getDisputeById,
@@ -10,7 +16,10 @@ import {
   getEvidence,
   uploadEvidence,
   escalateToSupport,
-  getTimeline
+  getTimeline,
+  respondToDispute,
+  acceptMediationProposal,
+  rejectMediationProposal,
 } from '../controllers/dispute.controller.js';
 
 const disputeRouter = Router();
@@ -75,9 +84,16 @@ disputeRouter.route('/:id/messages').get(verifyJwt, getMessages);
 disputeRouter.route('/:id/messages').post(verifyJwt, sendMessage);
 
 disputeRouter.route('/:id/evidence').get(verifyJwt, getEvidence);
-disputeRouter.route('/:id/evidence').post(verifyJwt, uploadEvidence);
+disputeRouter.route('/:id/evidence').post(verifyJwt, upload.single('file'), uploadEvidence);
 
 disputeRouter.route('/:id/escalate').put(verifyJwt, escalateToSupport);
 disputeRouter.route('/:id/timeline').get(verifyJwt, getTimeline);
+
+// Respondent submits their initial response
+disputeRouter.route('/:id/respond').put(verifyJwt, respondToDispute);
+
+// Both-party mediation acceptance flow
+disputeRouter.route('/:id/mediation-accept').put(verifyJwt, acceptMediationProposal);
+disputeRouter.route('/:id/mediation-reject').put(verifyJwt, rejectMediationProposal);
 
 export default disputeRouter;

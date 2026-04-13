@@ -260,6 +260,123 @@ export const Welcome_Email_Template = `
   </html>
 `;
 
+export const Dispute_Created_Template = ({ projectTitle, disputeId, reason, deadline }) => `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Dispute Opened</title>
+  <style>
+    body { font-family: Arial, sans-serif; background: #f4f4f4; margin: 0; padding: 0; }
+    .container { max-width: 600px; margin: 30px auto; background: #fff; border-radius: 8px; border: 1px solid #ddd; overflow: hidden; }
+    .header { background: #EF4444; color: #fff; padding: 20px; text-align: center; font-size: 22px; font-weight: bold; }
+    .content { padding: 25px; color: #333; line-height: 1.8; }
+    .badge { display: inline-block; background: #FEF2F2; color: #B91C1C; padding: 6px 14px; border-radius: 6px; font-weight: bold; border: 1px solid #FCA5A5; }
+    .deadline { background: #FFFBEB; border: 1px solid #FCD34D; border-radius: 6px; padding: 10px 16px; color: #92400E; margin-top: 14px; }
+    .footer { background: #f4f4f4; padding: 14px; text-align: center; color: #888; font-size: 12px; border-top: 1px solid #ddd; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">Dispute Opened</div>
+    <div class="content">
+      <p>A dispute has been opened for project: <strong>${projectTitle}</strong>.</p>
+      <p>Reference: <span class="badge">#DISP-${disputeId}</span></p>
+      <p><strong>Reason:</strong> ${reason}</p>
+      ${deadline ? `<div class="deadline">⏰ You have until <strong>${deadline}</strong> to respond to this dispute.</div>` : ''}
+      <p>Please log in to the platform to review the dispute details and provide your response.</p>
+    </div>
+    <div class="footer"><p>&copy; ${new Date().getFullYear()} Meraki. All rights reserved.</p></div>
+  </div>
+</body>
+</html>`;
+
+export const Dispute_Status_Template = ({ projectTitle, disputeId, status, message }) => `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Dispute Update</title>
+  <style>
+    body { font-family: Arial, sans-serif; background: #f4f4f4; margin: 0; padding: 0; }
+    .container { max-width: 600px; margin: 30px auto; background: #fff; border-radius: 8px; border: 1px solid #ddd; overflow: hidden; }
+    .header { background: #444751; color: #fff; padding: 20px; text-align: center; font-size: 22px; font-weight: bold; }
+    .content { padding: 25px; color: #333; line-height: 1.8; }
+    .status-badge { display: inline-block; background: #F3F4F6; color: #374151; padding: 6px 14px; border-radius: 6px; font-weight: bold; border: 1px solid #D1D5DB; }
+    .footer { background: #f4f4f4; padding: 14px; text-align: center; color: #888; font-size: 12px; border-top: 1px solid #ddd; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">Dispute Status Update</div>
+    <div class="content">
+      <p>Your dispute for project <strong>${projectTitle}</strong> has been updated.</p>
+      <p>Reference: <strong>#DISP-${disputeId}</strong></p>
+      <p>New Status: <span class="status-badge">${status}</span></p>
+      ${message ? `<p>${message}</p>` : ''}
+      <p>Please log in to view the full details.</p>
+    </div>
+    <div class="footer"><p>&copy; ${new Date().getFullYear()} Meraki. All rights reserved.</p></div>
+  </div>
+</body>
+</html>`;
+
+export const Dispute_Resolved_Template = ({ projectTitle, disputeId, decision, adminNotes }) => `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Dispute Resolved</title>
+  <style>
+    body { font-family: Arial, sans-serif; background: #f4f4f4; margin: 0; padding: 0; }
+    .container { max-width: 600px; margin: 30px auto; background: #fff; border-radius: 8px; border: 1px solid #ddd; overflow: hidden; }
+    .header { background: ${decision === 'resolved' ? '#10B981' : '#6B7280'}; color: #fff; padding: 20px; text-align: center; font-size: 22px; font-weight: bold; }
+    .content { padding: 25px; color: #333; line-height: 1.8; }
+    .notes { background: #F9FAFB; border-left: 4px solid #D1D5DB; padding: 12px 16px; border-radius: 4px; margin-top: 14px; }
+    .footer { background: #f4f4f4; padding: 14px; text-align: center; color: #888; font-size: 12px; border-top: 1px solid #ddd; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">Dispute ${decision === 'resolved' ? 'Resolved' : 'Closed'}</div>
+    <div class="content">
+      <p>Your dispute for project <strong>${projectTitle}</strong> (Ref: #DISP-${disputeId}) has been <strong>${decision === 'resolved' ? 'resolved' : 'closed'}</strong> by our team.</p>
+      ${adminNotes ? `<div class="notes"><strong>Admin Notes:</strong><br>${adminNotes}</div>` : ''}
+      <p>Please log in to view the outcome and any next steps.</p>
+    </div>
+    <div class="footer"><p>&copy; ${new Date().getFullYear()} Meraki. All rights reserved.</p></div>
+  </div>
+</body>
+</html>`;
+
+export const Dispute_Question_Template = ({ disputeId, question }) => `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Admin Question</title>
+  <style>
+    body { font-family: Arial, sans-serif; background: #f4f4f4; margin: 0; padding: 0; }
+    .container { max-width: 600px; margin: 30px auto; background: #fff; border-radius: 8px; border: 1px solid #ddd; overflow: hidden; }
+    .header { background: #1D4ED8; color: #fff; padding: 20px; text-align: center; font-size: 22px; font-weight: bold; }
+    .content { padding: 25px; color: #333; line-height: 1.8; }
+    .question-box { background: #EFF6FF; border: 1px solid #BFDBFE; border-radius: 8px; padding: 16px; color: #1E3A5F; margin: 14px 0; }
+    .footer { background: #f4f4f4; padding: 14px; text-align: center; color: #888; font-size: 12px; border-top: 1px solid #ddd; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">Admin Has a Question</div>
+    <div class="content">
+      <p>Our dispute resolution team has a question regarding dispute <strong>#DISP-${disputeId}</strong>:</p>
+      <div class="question-box">${question}</div>
+      <p>Please log in to the Resolution Center and reply at your earliest convenience.</p>
+    </div>
+    <div class="footer"><p>&copy; ${new Date().getFullYear()} Meraki. All rights reserved.</p></div>
+  </div>
+</body>
+</html>`;
+
 export const TwoFA_Email_Template = (otp) => `
 <!DOCTYPE html>
 <html lang="en">

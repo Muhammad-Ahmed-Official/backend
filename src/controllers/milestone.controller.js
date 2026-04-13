@@ -265,6 +265,10 @@ export const approveMilestone = asyncHandler(async (req, res) => {
   if (project.clientId !== userId) {
     throw new ApiError(StatusCodes.FORBIDDEN, 'Only the client can approve milestones');
   }
+  if (milestone.status === 'disputed') {
+    throw new ApiError(StatusCodes.CONFLICT, 'Cannot approve a milestone with an active dispute. Resolve the dispute first.');
+  }
+
   if (milestone.status !== 'in_review' && milestone.status !== 'submitted') {
     throw new ApiError(StatusCodes.BAD_REQUEST, 'Milestone must be in review before approving');
   }

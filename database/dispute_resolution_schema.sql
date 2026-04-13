@@ -40,6 +40,20 @@ CREATE TABLE IF NOT EXISTS dispute_timeline (
     performed_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- Admin question support: message_type distinguishes regular messages from admin questions
+ALTER TABLE dispute_messages ADD COLUMN IF NOT EXISTS message_type TEXT DEFAULT 'message';
+
+-- Escalation flag: does NOT change dispute status — keeps lifecycle state intact
+ALTER TABLE disputes ADD COLUMN IF NOT EXISTS is_escalated BOOLEAN DEFAULT FALSE;
+ALTER TABLE disputes ADD COLUMN IF NOT EXISTS escalation_reason TEXT;
+ALTER TABLE disputes ADD COLUMN IF NOT EXISTS escalated_at TIMESTAMPTZ;
+
+-- Migrate legacy records: disputes with status='escalated' get the flag set
+UPDATE disputes
+SET is_escalated = TRUE,
+    escalated_at = COALESCE(escalated_at, updated_at, created_at)
+WHERE status = 'escalated' AND (is_escalated IS NULL OR is_escalated = FALSE);
+
 -- Add indexes for performance
 CREATE INDEX IF NOT EXISTS idx_dispute_messages_dispute_id ON dispute_messages(dispute_id);
 CREATE INDEX IF NOT EXISTS idx_dispute_evidence_dispute_id ON dispute_evidence(dispute_id);

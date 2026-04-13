@@ -8,6 +8,7 @@ export class DisputeMessage {
         this.content = data.content;
         this.attachments = data.attachments || [];
         this.isInternal = data.is_internal || false;
+        this.messageType = data.message_type || 'message';
         this.createdAt = data.created_at;
         // Joined data
         this.sender = data.sender || null;
@@ -21,6 +22,7 @@ export class DisputeMessage {
             content: this.content,
             attachments: this.attachments,
             isInternal: this.isInternal,
+            messageType: this.messageType,
             createdAt: this.createdAt,
             sender: this.sender,
         };
@@ -53,6 +55,7 @@ export class DisputeMessage {
                 content: messageData.content,
                 attachments: messageData.attachments || [],
                 is_internal: messageData.isInternal || false,
+                message_type: messageData.messageType || 'message',
             })
             .select(`
         *,

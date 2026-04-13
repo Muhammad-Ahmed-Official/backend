@@ -39,8 +39,31 @@ async function runMigrations() {
   console.warn('='.repeat(70));
 }
 
+// Ensure the Supabase Storage bucket for evidence exists and is public
+async function ensureEvidenceBucket() {
+  try {
+    const BUCKET = 'dispute-evidence';
+    // Try creating the bucket — idempotent: fails silently if it already exists
+    const { error } = await supabase.storage.createBucket(BUCKET, {
+      public: true,
+      fileSizeLimit: 10 * 1024 * 1024,
+      allowedMimeTypes: ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'],
+    });
+    if (error && !error.message?.includes('already exists') && !error.message?.includes('duplicate')) {
+      console.warn(`[Storage] Could not create '${BUCKET}' bucket: ${error.message}`);
+      console.warn('[Storage] Create the bucket manually in Supabase Dashboard → Storage → New Bucket');
+      console.warn(`[Storage] Bucket name: ${BUCKET}  |  Public: YES`);
+    } else {
+      console.log(`[Storage] '${BUCKET}' bucket ready.`);
+    }
+  } catch (err) {
+    console.warn('[Storage] Bucket check skipped:', err.message);
+  }
+}
+
 async function startServer() {
   await runMigrations();
+  await ensureEvidenceBucket();
 
   let currentPort = DEFAULT_PORT;
   let attempts = 0;
