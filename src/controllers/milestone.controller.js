@@ -8,6 +8,7 @@ import { ApiError } from '../utils/ApiError.js';
 import { ApiResponse } from '../utils/ApiResponse.js';
 import { StatusCodes } from 'http-status-codes';
 import { asyncHandler } from '../utils/asyncHandler.js';
+import { sendMilestoneSubmittedAdminEmail } from '../utils/sendEmail.js';
 
 // Helper: emit socket event
 const emitSocket = (req, room, event, payload) => {
@@ -144,6 +145,119 @@ export const fundMilestone = asyncHandler(async (req, res) => {
   );
 });
 
+// PATCH /api/v1/milestones/:milestoneId/fund-external  (Client only)
+// Records escrow as HELD without deducting in-app wallet (payment made off-platform, e.g. PayPal to owner).
+export const fundMilestoneExternal = asyncHandler(async (req, res) => {
+  const { milestoneId } = req.params;
+  const userId = req.user.id;
+
+  const milestone = await Milestone.findById(milestoneId);
+  if (!milestone) throw new ApiError(StatusCodes.NOT_FOUND, 'Milestone not found');
+
+  const project = await Project.findById(milestone.projectId);
+  if (!project) throw new ApiError(StatusCodes.NOT_FOUND, 'Project not found');
+  if (project.clientId !== userId) {
+    throw new ApiError(StatusCodes.FORBIDDEN, 'Only the client can fund milestones');
+  }
+  if (!project.freelancerId) {
+    throw new ApiError(StatusCodes.BAD_REQUEST, 'Assign a freelancer before funding milestones');
+  }
+  if (!milestone.amount || milestone.amount <= 0) {
+    throw new ApiError(StatusCodes.BAD_REQUEST, 'Milestone amount must be set before funding');
+  }
+  if (milestone.status !== 'pending') {
+    throw new ApiError(StatusCodes.BAD_REQUEST, 'Only pending milestones can be funded');
+  }
+
+  const existing = await EscrowTransaction.findHeldByMilestoneId(milestoneId);
+  if (existing) {
+    throw new ApiError(StatusCodes.BAD_REQUEST, 'This milestone already has active escrow');
+  }
+
+  await EscrowTransaction.createHeld({
+    milestoneId,
+    payerId: userId,
+    payeeId: project.freelancerId,
+    amount: milestone.amount,
+  });
+  const updated = await Milestone.updateStatus(milestoneId, 'funded');
+
+  if (project.freelancerId) {
+    emitSocket(req, project.freelancerId, 'milestoneUpdate', {
+      projectId: project.id,
+      action: 'funded',
+      milestone: updated.toJSON(),
+    });
+    Notification.create({
+      userId: project.freelancerId,
+      type: 'milestone_funded',
+      title: 'Milestone Funded',
+      message: `"${milestone.title}" has been funded. You can now start working on it.`,
+      relatedId: project.id,
+    }).catch(() => {});
+  }
+
+  return res.status(StatusCodes.OK).send(
+    new ApiResponse(StatusCodes.OK, 'Milestone funded (off-platform payment recorded)', {
+      milestone: updated.toJSON(),
+    })
+  );
+});
+
+// POST /api/v1/projects/:projectId/milestones/fund-all-external  (Client only)
+// Unlocks every pending milestone with an amount (off-platform / PayPal) in one action.
+export const fundAllMilestonesExternal = asyncHandler(async (req, res) => {
+  const { projectId } = req.params;
+  const userId = req.user.id;
+
+  const project = await Project.findById(projectId);
+  if (!project) throw new ApiError(StatusCodes.NOT_FOUND, 'Project not found');
+  if (project.clientId !== userId) {
+    throw new ApiError(StatusCodes.FORBIDDEN, 'Only the client can unlock milestones');
+  }
+  if (!project.freelancerId) {
+    throw new ApiError(StatusCodes.BAD_REQUEST, 'Assign a freelancer before unlocking milestones');
+  }
+
+  const milestones = await Milestone.findByProjectId(projectId);
+  const unlocked = [];
+
+  for (const milestone of milestones) {
+    if (milestone.status !== 'pending' || !milestone.amount || milestone.amount <= 0) continue;
+    const existing = await EscrowTransaction.findHeldByMilestoneId(milestone.id);
+    if (existing) continue;
+
+    await EscrowTransaction.createHeld({
+      milestoneId: milestone.id,
+      payerId: userId,
+      payeeId: project.freelancerId,
+      amount: milestone.amount,
+    });
+    const updated = await Milestone.updateStatus(milestone.id, 'funded');
+    unlocked.push(updated.toJSON());
+
+    emitSocket(req, project.freelancerId, 'milestoneUpdate', {
+      projectId: project.id,
+      action: 'funded',
+      milestone: updated.toJSON(),
+    });
+    Notification.create({
+      userId: project.freelancerId,
+      type: 'milestone_funded',
+      title: 'Milestone Funded',
+      message: `"${milestone.title}" has been funded. You can now start working on it.`,
+      relatedId: project.id,
+    }).catch(() => {});
+  }
+
+  return res.status(StatusCodes.OK).send(
+    new ApiResponse(StatusCodes.OK, `Unlocked ${unlocked.length} milestone(s) for the freelancer`, {
+      milestones: unlocked,
+      count: unlocked.length,
+    })
+  );
+});
+
 // PATCH /api/v1/milestones/:milestoneId/start  (Freelancer)
 export const startMilestone = asyncHandler(async (req, res) => {
   const { milestoneId } = req.params;
@@ -187,6 +301,15 @@ export const startMilestone = asyncHandler(async (req, res) => {
 export const submitMilestone = asyncHandler(async (req, res) => {
   const { milestoneId } = req.params;
   const userId = req.user.id;
+  const { githubUrl } = req.body;
+
+  // Validate GitHub URL if provided
+  if (githubUrl) {
+    const isValidGithubUrl = /^https?:\/\/(www\.)?github\.com\/.+/.test(githubUrl.trim());
+    if (!isValidGithubUrl) {
+      throw new ApiError(StatusCodes.BAD_REQUEST, 'Invalid GitHub URL — must start with https://github.com/');
+    }
+  }
 
   const milestone = await Milestone.findById(milestoneId);
   if (!milestone) throw new ApiError(StatusCodes.NOT_FOUND, 'Milestone not found');
@@ -202,8 +325,9 @@ export const submitMilestone = asyncHandler(async (req, res) => {
   if (milestone.status === 'in_review' || milestone.status === 'submitted') {
     throw new ApiError(StatusCodes.BAD_REQUEST, 'Milestone already submitted — awaiting client review');
   }
-  if (milestone.status !== 'in_progress') {
-    throw new ApiError(StatusCodes.BAD_REQUEST, 'Milestone must be in progress before submitting');
+  const submittable = ['pending', 'funded', 'in_progress'];
+  if (!submittable.includes(milestone.status)) {
+    throw new ApiError(StatusCodes.BAD_REQUEST, 'Milestone cannot be submitted in its current state');
   }
 
   const now = new Date();
@@ -212,10 +336,12 @@ export const submitMilestone = asyncHandler(async (req, res) => {
   const updated = await Milestone.updateStatus(milestoneId, 'in_review', {
     submitted_at: now.toISOString(),
     review_deadline: reviewDeadline.toISOString(),
+    ...(githubUrl ? { submission_github_url: githubUrl.trim() } : {}),
   });
 
   // Send system message to client
-  const chatMsg = `✅ Milestone "${milestone.title}" has been submitted for your review. You have 14 days to approve or raise a dispute.`;
+  const githubLine = githubUrl ? `\n🔗 GitHub: ${githubUrl.trim()}` : '';
+  const chatMsg = `✅ Milestone "${milestone.title}" has been submitted. Please accept or reject in the app.${githubLine}`;
   const chat = await Chat.create({
     senderId: userId,
     receiverId: project.clientId,
@@ -242,9 +368,42 @@ export const submitMilestone = asyncHandler(async (req, res) => {
     userId: project.clientId,
     type: 'milestone_submitted',
     title: 'Milestone Ready for Review',
-    message: `"${milestone.title}" has been submitted. You have 14 days to approve or request changes.`,
+    message: `"${milestone.title}" has been submitted. Accept or reject in the app.`,
     relatedId: project.id,
   }).catch(() => {});
+
+  try {
+    const clientData = project.client || { id: project.clientId };
+    const freelancerData = project.freelancer || { id: project.freelancerId };
+    await sendMilestoneSubmittedAdminEmail({
+      project: {
+        id: project.id,
+        title: project.title,
+        description: project.description,
+        budget: project.budget,
+        status: project.status,
+      },
+      client: {
+        id: clientData.id || project.clientId,
+        email: clientData.email || '',
+        userName: clientData.userName || clientData.user_name || '',
+      },
+      freelancer: {
+        id: freelancerData.id || project.freelancerId,
+        email: freelancerData.email || '',
+        userName: freelancerData.userName || freelancerData.user_name || '',
+      },
+      milestone: {
+        id: milestone.id,
+        title: milestone.title,
+        description: milestone.description,
+        amount: milestone.amount,
+        submittedAt: updated.submittedAt,
+      },
+    });
+  } catch (emailErr) {
+    console.error('[submitMilestone] Admin notification email failed:', emailErr);
+  }
 
   return res.status(StatusCodes.OK).send(
     new ApiResponse(StatusCodes.OK, 'Milestone submitted for review', { milestone: updated.toJSON() })
@@ -252,7 +411,8 @@ export const submitMilestone = asyncHandler(async (req, res) => {
 });
 
 // PATCH /api/v1/milestones/:milestoneId/approve  (Client)
-// Releases escrow atomically if escrow exists; otherwise just marks as released (pre-escrow milestones).
+// Marks milestone as released and notifies admin via email to release payment to freelancer.
+// Funds are NOT automatically transferred to the freelancer wallet — admin handles payment manually.
 export const approveMilestone = asyncHandler(async (req, res) => {
   const { milestoneId } = req.params;
   const userId = req.user.id;
@@ -273,55 +433,25 @@ export const approveMilestone = asyncHandler(async (req, res) => {
     throw new ApiError(StatusCodes.BAD_REQUEST, 'Milestone must be in review before approving');
   }
 
-  // If a HELD escrow record exists → atomic release (moves money to freelancer).
-  // If no escrow record (pre-escrow milestone) → just mark as released.
+  // Mark escrow as RELEASED (without moving funds to freelancer wallet — admin handles this manually)
   const escrow = await EscrowTransaction.findHeldByMilestoneId(milestoneId);
-  const updated = escrow
-    ? await Milestone.releaseAtomic(milestoneId)
-    : await Milestone.updateStatus(milestoneId, 'released');
+  if (escrow) {
+    await EscrowTransaction.markAsReleased(milestoneId);
+  }
+
+  // Update milestone status to 'released'
+  const updated = await Milestone.updateStatus(milestoneId, 'released', {
+    approved_at: new Date().toISOString(),
+  });
 
   // Recalculate project progress
   const progress = await Milestone.calculateProjectProgress(milestone.projectId);
   await Project.findByIdAndUpdate(milestone.projectId, { progress });
 
-  // Log payment transactions when escrow is released
-  if (escrow) {
-    try {
-      // Credit for freelancer
-      const freelancerWallet = await Wallet.findByUserId(project.freelancerId);
-      if (freelancerWallet) {
-        await Transaction.create({
-          wallet_id: freelancerWallet.id,
-          user_id: project.freelancerId,
-          type: 'payment',
-          amount: milestone.amount,
-          description: `Payment received: ${milestone.title}`,
-          status: 'completed',
-          project_id: project.id,
-        });
-      }
-      // Debit record for client (escrow released)
-      const clientWallet = await Wallet.findByUserId(userId);
-      if (clientWallet) {
-        await Transaction.create({
-          wallet_id: clientWallet.id,
-          user_id: userId,
-          type: 'payment',
-          amount: milestone.amount,
-          description: `Payment released: ${milestone.title}`,
-          status: 'completed',
-          project_id: project.id,
-        });
-      }
-    } catch (txErr) {
-      console.error('[approveMilestone] Failed to log transactions:', txErr);
-    }
-  }
+  // Admin is notified when the freelancer submits work; no duplicate email on client accept.
 
-  // Send system message to freelancer
-  const chatMsg = escrow
-    ? `🎉 Milestone "${milestone.title}" approved! Funds have been released to your wallet. Overall progress: ${progress}%`
-    : `🎉 Milestone "${milestone.title}" approved! Overall progress: ${progress}%`;
+  // Notify freelancer via chat: payment is pending admin release
+  const chatMsg = `🎉 Milestone "${milestone.title}" has been approved! Payment of $${Number(milestone.amount || 0).toFixed(2)} is pending release by the admin. You will be contacted once the payment is processed. Overall progress: ${progress}%`;
   const chat = await Chat.create({
     senderId: userId,
     receiverId: project.freelancerId,
@@ -354,15 +484,13 @@ export const approveMilestone = asyncHandler(async (req, res) => {
   Notification.create({
     userId: project.freelancerId,
     type: 'milestone_approved',
-    title: 'Milestone Approved',
-    message: escrow
-      ? `"${milestone.title}" was approved and funds have been released to your wallet.`
-      : `"${milestone.title}" was approved. Project progress: ${progress}%.`,
+    title: 'Milestone Approved — Payment Pending',
+    message: `"${milestone.title}" was approved. Payment of $${Number(milestone.amount || 0).toFixed(2)} is pending release by the admin.`,
     relatedId: project.id,
   }).catch(() => {});
 
   return res.status(StatusCodes.OK).send(
-    new ApiResponse(StatusCodes.OK, 'Milestone approved — funds released to freelancer', {
+    new ApiResponse(StatusCodes.OK, 'Milestone accepted — admin was notified at submission to release payment', {
       milestone: updated.toJSON(),
       progress,
     })

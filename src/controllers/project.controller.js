@@ -59,11 +59,6 @@ export const createProject = asyncHandler(async (req, res) => {
     throw new ApiError(StatusCodes.BAD_REQUEST, 'Title, description, and budget are required');
   }
 
-  // Verify user is a client
-  if (req.user.role !== 'Client') {
-    throw new ApiError(StatusCodes.FORBIDDEN, 'Only clients can create projects');
-  }
-
   // Verify Stripe payment before creating the project
   if (!paymentIntentId) {
     throw new ApiError(StatusCodes.BAD_REQUEST, 'Payment is required to create a project');

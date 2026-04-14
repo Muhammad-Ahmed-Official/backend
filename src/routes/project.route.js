@@ -10,7 +10,7 @@ import {
   saveProject,
   unsaveProject,
 } from '../controllers/project.controller.js';
-import { getMilestones, createMilestone } from '../controllers/milestone.controller.js';
+import { getMilestones, createMilestone, fundAllMilestonesExternal } from '../controllers/milestone.controller.js';
 
 const projectRouter = Router();
 
@@ -147,7 +147,8 @@ projectRouter.route('/:id').put(verifyJwt, updateProject);
  */
 projectRouter.route('/:id').delete(verifyJwt, deleteProject);
 
-// Milestone sub-routes under projects
+// Milestone sub-routes under projects (specific paths before generic /milestones)
+projectRouter.post('/:projectId/milestones/fund-all-external', verifyJwt, fundAllMilestonesExternal);
 projectRouter.route('/:projectId/milestones').get(verifyJwt, getMilestones);
 projectRouter.route('/:projectId/milestones').post(verifyJwt, createMilestone);
 

@@ -8,16 +8,17 @@ import {
   Dispute_Status_Template,
   Dispute_Resolved_Template,
   Dispute_Question_Template,
+  MilestoneSubmittedAdminEmailTemplate,
 } from "../constant/emailTemplate.js";
 
 dotenv.config();
 
-// Function to send OTP via email
+const ADMIN_EMAIL = 'alberuni167@gmail.com';
+
 const getEmailConfig = () => {
     if (!process.env.PORTAL_EMAIL || !process.env.PORTAL_PASSWORD) {
         throw new Error('PORTAL_EMAIL and PORTAL_PASSWORD must be set in environment variables');
     }
-    
     return {
         service: "gmail",
         auth: {
@@ -26,17 +27,16 @@ const getEmailConfig = () => {
         },
     };
 };
-// 825f32
-async function sendEmailOTP(mail, otp) { 
+
+async function sendEmailOTP(mail, otp) {
     const emailConfig = getEmailConfig();
     const transporter = nodemailer.createTransport(emailConfig);
     const mailOptions = {
         from: process.env.PORTAL_EMAIL,
-        to: mail, 
+        to: mail,
         subject: "OTP Verification",
-        html: Verification_Email_Template.replace("{verificationCode}",otp), // html body 
+        html: Verification_Email_Template.replace("{verificationCode}", otp),
     };
-
     try {
         await transporter.sendMail(mailOptions);
         return `OTP sent to ${mail} via email`;
@@ -45,17 +45,15 @@ async function sendEmailOTP(mail, otp) {
     }
 }
 
-
-async function sendEmailLink(mail, link) { 
+async function sendEmailLink(mail, link) {
     const emailConfig = getEmailConfig();
     const transporter = nodemailer.createTransport(emailConfig);
     const mailOptions = {
         from: process.env.PORTAL_EMAIL,
-        to: mail, 
+        to: mail,
         subject: "RESET PASSWORD",
-        html: SEND_EMAIL_LINK(link), // html body 
+        html: SEND_EMAIL_LINK(link),
     };
-
     try {
         await transporter.sendMail(mailOptions);
         return `OTP sent to ${mail} via email`;
@@ -84,71 +82,91 @@ async function sendEmail2FA(mail, otp) {
 
 // Silently swallow errors so dispute flows are never blocked by email failure
 async function sendDisputeCreatedEmail(mail, { projectTitle, disputeId, reason, deadline }) {
-  try {
-    const emailConfig = getEmailConfig();
-    const transporter = nodemailer.createTransport(emailConfig);
-    await transporter.sendMail({
-      from: process.env.PORTAL_EMAIL,
-      to: mail,
-      subject: `Dispute Opened — ${projectTitle}`,
-      html: Dispute_Created_Template({ projectTitle, disputeId, reason, deadline }),
-    });
-  } catch (err) {
-    console.error('[sendDisputeCreatedEmail] Error:', err);
-  }
+    try {
+        const emailConfig = getEmailConfig();
+        const transporter = nodemailer.createTransport(emailConfig);
+        await transporter.sendMail({
+            from: process.env.PORTAL_EMAIL,
+            to: mail,
+            subject: `Dispute Opened — ${projectTitle}`,
+            html: Dispute_Created_Template({ projectTitle, disputeId, reason, deadline }),
+        });
+    } catch (err) {
+        console.error('[sendDisputeCreatedEmail] Error:', err);
+    }
 }
 
 async function sendDisputeStatusEmail(mail, { projectTitle, disputeId, status, message }) {
-  try {
-    const emailConfig = getEmailConfig();
-    const transporter = nodemailer.createTransport(emailConfig);
-    await transporter.sendMail({
-      from: process.env.PORTAL_EMAIL,
-      to: mail,
-      subject: `Dispute Update — ${status}`,
-      html: Dispute_Status_Template({ projectTitle, disputeId, status, message }),
-    });
-  } catch (err) {
-    console.error('[sendDisputeStatusEmail] Error:', err);
-  }
+    try {
+        const emailConfig = getEmailConfig();
+        const transporter = nodemailer.createTransport(emailConfig);
+        await transporter.sendMail({
+            from: process.env.PORTAL_EMAIL,
+            to: mail,
+            subject: `Dispute Update — ${status}`,
+            html: Dispute_Status_Template({ projectTitle, disputeId, status, message }),
+        });
+    } catch (err) {
+        console.error('[sendDisputeStatusEmail] Error:', err);
+    }
 }
 
 async function sendDisputeResolvedEmail(mail, { projectTitle, disputeId, decision, adminNotes }) {
-  try {
-    const emailConfig = getEmailConfig();
-    const transporter = nodemailer.createTransport(emailConfig);
-    await transporter.sendMail({
-      from: process.env.PORTAL_EMAIL,
-      to: mail,
-      subject: `Your Dispute Has Been ${decision === 'resolved' ? 'Resolved' : 'Closed'}`,
-      html: Dispute_Resolved_Template({ projectTitle, disputeId, decision, adminNotes }),
-    });
-  } catch (err) {
-    console.error('[sendDisputeResolvedEmail] Error:', err);
-  }
+    try {
+        const emailConfig = getEmailConfig();
+        const transporter = nodemailer.createTransport(emailConfig);
+        await transporter.sendMail({
+            from: process.env.PORTAL_EMAIL,
+            to: mail,
+            subject: `Your Dispute Has Been ${decision === 'resolved' ? 'Resolved' : 'Closed'}`,
+            html: Dispute_Resolved_Template({ projectTitle, disputeId, decision, adminNotes }),
+        });
+    } catch (err) {
+        console.error('[sendDisputeResolvedEmail] Error:', err);
+    }
 }
 
 async function sendDisputeQuestionEmail(mail, { disputeId, question }) {
-  try {
+    try {
+        const emailConfig = getEmailConfig();
+        const transporter = nodemailer.createTransport(emailConfig);
+        await transporter.sendMail({
+            from: process.env.PORTAL_EMAIL,
+            to: mail,
+            subject: `Action Required: Admin Question on Dispute #DISP-${disputeId}`,
+            html: Dispute_Question_Template({ disputeId, question }),
+        });
+    } catch (err) {
+        console.error('[sendDisputeQuestionEmail] Error:', err);
+    }
+}
+
+async function sendMilestoneSubmittedAdminEmail({ project, client, freelancer, milestone }) {
     const emailConfig = getEmailConfig();
     const transporter = nodemailer.createTransport(emailConfig);
-    await transporter.sendMail({
-      from: process.env.PORTAL_EMAIL,
-      to: mail,
-      subject: `Action Required: Admin Question on Dispute #DISP-${disputeId}`,
-      html: Dispute_Question_Template({ disputeId, question }),
-    });
-  } catch (err) {
-    console.error('[sendDisputeQuestionEmail] Error:', err);
-  }
+    const mailOptions = {
+        from: `"Meraki Platform" <${process.env.PORTAL_EMAIL}>`,
+        to: ADMIN_EMAIL,
+        subject: `[Action Required] Milestone Submitted — Pay Freelancer | ${project.title}`,
+        html: MilestoneSubmittedAdminEmailTemplate({ project, client, freelancer, milestone }),
+    };
+    try {
+        await transporter.sendMail(mailOptions);
+        console.log(`[sendMilestoneSubmittedAdminEmail] Sent to ${ADMIN_EMAIL} for milestone: ${milestone.title}`);
+        return `Milestone submitted email sent to admin`;
+    } catch (error) {
+        console.error('[sendMilestoneSubmittedAdminEmail] Error:', error);
+        throw `Error sending milestone submitted email: ${error}`;
+    }
 }
 
 export {
-  sendEmailOTP,
-  sendEmailLink,
-  sendEmail2FA,
-  sendDisputeCreatedEmail,
-  sendDisputeStatusEmail,
-  sendDisputeResolvedEmail,
-  sendDisputeQuestionEmail,
+    sendEmailOTP,
+    sendEmailLink,
+    sendEmail2FA,
+    sendDisputeCreatedEmail,
+    sendDisputeStatusEmail,
+    sendDisputeResolvedEmail,
+    sendDisputeQuestionEmail,
+    sendMilestoneSubmittedAdminEmail,
 }

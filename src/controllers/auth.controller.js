@@ -230,7 +230,12 @@ export const signin = asyncHandler(async (req, res) => {
     if (user.isVerified !== true) {
         throw new ApiError(StatusCodes.FORBIDDEN, NOT_VERIFY);
     }
-      
+
+    // Block suspended users
+    if (user.status === 'suspended') {
+        throw new ApiError(StatusCodes.FORBIDDEN, 'Your account has been suspended. Please contact support.');
+    }
+
     // For Admin, preserve existing direct-signin behaviour (no role picker)
     if (user.role === 'Admin') {
         const { accessToken, refreshToken } = await generateAccessAndRefreshToken(user.id, user.role);
@@ -353,6 +358,11 @@ export const signinWithRole = asyncHandler(async (req, res) => {
 
     if (user.isVerified !== true) {
         throw new ApiError(StatusCodes.FORBIDDEN, NOT_VERIFY);
+    }
+
+    // Block suspended users
+    if (user.status === 'suspended') {
+        throw new ApiError(StatusCodes.FORBIDDEN, 'Your account has been suspended. Please contact support.');
     }
 
     // If 2FA is enabled, require a valid preAuthToken (issued by /2fa/pre-verify)

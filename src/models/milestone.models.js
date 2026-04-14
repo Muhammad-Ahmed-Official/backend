@@ -13,6 +13,7 @@ export class Milestone {
     this.submittedAt = data.submitted_at || null;
     this.reviewDeadline = data.review_deadline || null;
     this.approvedAt = data.approved_at || null;
+    this.submissionGithubUrl = data.submission_github_url || null;
     this.createdAt = data.created_at;
     this.updatedAt = data.updated_at;
   }
@@ -30,6 +31,7 @@ export class Milestone {
       submittedAt: this.submittedAt,
       reviewDeadline: this.reviewDeadline,
       approvedAt: this.approvedAt,
+      submissionGithubUrl: this.submissionGithubUrl,
       createdAt: this.createdAt,
       updatedAt: this.updatedAt,
     };

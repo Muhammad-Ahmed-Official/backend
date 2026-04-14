@@ -43,7 +43,12 @@ export const getDashboardStats = asyncHandler(async (req, res) => {
         .from('disputes')
         .select('*', { count: 'exact', head: true });
 
-    if (fError || cError || pError || rError || sError || dError) {
+    // 7. Total Notifications
+    const { count: totalNotifications, error: nError } = await supabase
+        .from('notifications')
+        .select('*', { count: 'exact', head: true });
+
+    if (fError || cError || pError || rError || sError || dError || nError) {
         throw new ApiError(StatusCodes.INTERNAL_SERVER_ERROR, "Error fetching dashboard stats");
     }
 
@@ -56,7 +61,8 @@ export const getDashboardStats = asyncHandler(async (req, res) => {
             activeProjects: activeProjects || 0,
             totalRevenue: totalRevenue || 0,
             totalServices: totalServices || 0,
-            totalDisputes: totalDisputes || 0
+            totalDisputes: totalDisputes || 0,
+            totalNotifications: totalNotifications || 0,
         })
     );
 });
